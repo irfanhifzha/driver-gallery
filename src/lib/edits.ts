@@ -76,6 +76,46 @@ export function readEdits(): EditMap {
   }
 }
 
+/** Pretty JSON envelope, for the editor's Export action. */
+export function editsToJson(edits: EditMap): string {
+  return JSON.stringify(
+    {
+      version: VERSION,
+      exportedAt: new Date().toISOString(),
+      items: edits,
+    },
+    null,
+    2,
+  )
+}
+
+/**
+ * Accepts the exported envelope or a bare `id -> edit` map, and returns null
+ * when nothing in the file looks like an edit.
+ */
+export function parseEditsJson(text: string): EditMap | null {
+  try {
+    const parsed: unknown = JSON.parse(text)
+    if (!parsed || typeof parsed !== 'object') return null
+
+    const candidate = (parsed as { items?: unknown }).items ?? parsed
+    if (!candidate || typeof candidate !== 'object') return null
+
+    const edits: EditMap = {}
+    let found = 0
+    for (const [id, value] of Object.entries(
+      candidate as Record<string, unknown>,
+    )) {
+      if (!id || !isPhotoEdit(value)) continue
+      edits[id] = value
+      found += 1
+    }
+    return found > 0 ? edits : null
+  } catch {
+    return null
+  }
+}
+
 export function writeEdits(edits: EditMap) {
   try {
     localStorage.setItem(

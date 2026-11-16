@@ -102,6 +102,7 @@ export function Lightbox({
 
   const metaRef = useRef<HTMLDivElement>(null)
   const dockRef = useRef<HTMLDivElement>(null)
+  const cropRef = useRef<HTMLDivElement>(null)
   const adjustButtonRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLElement>(null)
   const infoButtonRef = useRef<HTMLButtonElement>(null)
@@ -495,8 +496,30 @@ export function Lightbox({
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return
-    // A crop frame owns the drag; no viewer pan, swipe or pinch while cropping.
-    if (crop) return
+
+    // While cropping, the whole photo area starts a crop drag. Starting the
+    // gesture here (rather than only on the frame) means a drag near the frame
+    // edge, or on the letterbox around it, can never fall through to the
+    // viewer and pan the image instead.
+    if (crop) {
+      const frame = cropRef.current
+      if (mode !== 'editor' || !frame) return
+
+      event.preventDefault()
+      event.currentTarget.setPointerCapture(event.pointerId)
+      const rect = frame.getBoundingClientRect()
+      cropDragRef.current = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        originX: crop.x,
+        originY: crop.y,
+        width: rect.width,
+        height: rect.height,
+      }
+      setCropping(true)
+      return
+    }
 
     event.currentTarget.setPointerCapture(event.pointerId)
     pointersRef.current.set(event.pointerId, {
@@ -548,6 +571,24 @@ export function Lightbox({
   }
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const cropDrag = cropDragRef.current
+    if (cropDrag && cropDrag.pointerId === event.pointerId) {
+      event.preventDefault()
+      const dx = event.clientX - cropDrag.startX
+      const dy = event.clientY - cropDrag.startY
+      setCrop((prev) =>
+        prev
+          ? clampCrop({
+              ...prev,
+              x: cropDrag.originX - dx / Math.max(1, cropDrag.width / 2),
+              y: cropDrag.originY - dy / Math.max(1, cropDrag.height / 2),
+            })
+          : prev,
+      )
+      setDirty(true)
+      return
+    }
+
     const point = pointersRef.current.get(event.pointerId)
     if (!point || crop) return
 
@@ -642,6 +683,16 @@ export function Lightbox({
     event: ReactPointerEvent<HTMLDivElement>,
     cancelled = false,
   ) => {
+    const cropDrag = cropDragRef.current
+    if (cropDrag && cropDrag.pointerId === event.pointerId) {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId)
+      }
+      cropDragRef.current = null
+      setCropping(false)
+      return
+    }
+
     const swipe = swipeRef.current
     pointersRef.current.delete(event.pointerId)
 
@@ -710,62 +761,6 @@ export function Lightbox({
     })
     setFailedId(image.id)
     setAdjustOpen(false)
-  }
-
-  // Crop repositioning lives on the crop frame; stopping propagation keeps the
-  // lightbox's pan and swipe gestures out of it.
-  const startCropDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!crop || mode !== 'editor') return
-    if (event.pointerType === 'mouse' && event.button !== 0) return
-
-    event.stopPropagation()
-    const rect = event.currentTarget.getBoundingClientRect()
-    event.currentTarget.setPointerCapture(event.pointerId)
-    cropDragRef.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      originX: crop.x,
-      originY: crop.y,
-      width: rect.width,
-      height: rect.height,
-    }
-    setCropping(true)
-  }
-
-  const moveCropDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const drag = cropDragRef.current
-    if (!drag || drag.pointerId !== event.pointerId) return
-
-    event.stopPropagation()
-    event.preventDefault()
-
-    // A full half-width drag covers the whole pan range, which matches how far
-    // the covered photo can actually move inside the frame.
-    const dx = event.clientX - drag.startX
-    const dy = event.clientY - drag.startY
-    setCrop((prev) =>
-      prev
-        ? clampCrop({
-            ...prev,
-            x: drag.originX - dx / Math.max(1, drag.width / 2),
-            y: drag.originY - dy / Math.max(1, drag.height / 2),
-          })
-        : prev,
-    )
-    setDirty(true)
-  }
-
-  const endCropDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const drag = cropDragRef.current
-    if (!drag || drag.pointerId !== event.pointerId) return
-
-    event.stopPropagation()
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId)
-    }
-    cropDragRef.current = null
-    setCropping(false)
   }
 
   if (!image) return null
@@ -993,13 +988,9 @@ export function Lightbox({
             >
               {crop ? (
                 <div
+                  ref={cropRef}
                   className={`lightbox-crop${cropping ? ' is-cropping' : ''}`}
                   style={{ '--crop-ratio': crop.ratio } as CSSProperties}
-                  onPointerDown={startCropDrag}
-                  onPointerMove={moveCropDrag}
-                  onPointerUp={endCropDrag}
-                  onPointerCancel={endCropDrag}
-                  onDoubleClick={(event) => event.stopPropagation()}
                 >
                   <img
                     src={fullSrc(image.id)}

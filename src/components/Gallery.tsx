@@ -15,6 +15,7 @@ import { useDriveImages } from '../hooks/useDriveImages'
 import { fileType, withoutRawDuplicates, type DriveImage } from '../lib/drive'
 import { readUrlState, updateUrl } from '../lib/urlState'
 import {
+  editsToJson,
   readEdits,
   writeEdits,
   type EditMap,
@@ -236,6 +237,34 @@ export function Gallery({ folderId }: GalleryProps) {
     writeEdits(next)
   }
 
+  const handleExportEdits = () => {
+    const blob = new Blob([editsToJson(edits)], {
+      type: 'application/json',
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `drive-gallery-edits-${new Date()
+      .toISOString()
+      .slice(0, 10)}.json`
+    document.body.append(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
+  const handleImportEdits = (imported: EditMap) => {
+    // Imported entries win for the same file id, like the favorites import.
+    const next = { ...edits, ...imported }
+    setEdits(next)
+    writeEdits(next)
+  }
+
+  const handleClearEdits = () => {
+    setEdits({})
+    writeEdits({})
+  }
+
   const handleResetFilters = () => {
     setQuery('')
     setType('all')
@@ -254,7 +283,14 @@ export function Gallery({ folderId }: GalleryProps) {
         onToggleHideRaw={handleToggleHideRaw}
       />
 
-      <ModeBar mode={mode} onChange={setMode} />
+      <ModeBar
+        mode={mode}
+        onChange={setMode}
+        editCount={Object.keys(edits).length}
+        onExportEdits={handleExportEdits}
+        onImportEdits={handleImportEdits}
+        onClearEdits={handleClearEdits}
+      />
 
       <main>
         {images.length > 0 ? (

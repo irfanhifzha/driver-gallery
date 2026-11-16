@@ -227,6 +227,131 @@
   color: var(--text);
 }
 
+.mode-bar-right {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+/* Editor-only menu for the saved-edit document. */
+.edits-menu {
+  position: relative;
+}
+
+.edits-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-h);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.edits-trigger svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+.edits-trigger:hover,
+.edits-trigger[aria-expanded='true'] {
+  color: var(--accent-strong);
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+}
+
+.edits-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.edits-count {
+  min-width: 18px;
+  padding: 1px 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 999px;
+}
+
+.edits-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 190px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-md);
+}
+
+.edits-dropdown button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 10px;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  color: var(--text-h);
+  background: transparent;
+  border: none;
+  border-radius: 9px;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.edits-dropdown button:hover:not(:disabled) {
+  color: var(--accent-strong);
+  background: var(--accent-bg);
+}
+
+.edits-dropdown button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.edits-dropdown button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.edits-dropdown .is-danger {
+  color: #a4342a;
+}
+
+.edits-dropdown .is-danger:hover:not(:disabled) {
+  color: #8f2a21;
+  background: #fbeeec;
+}
+
+.edits-error {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: 12px;
+  color: #a4342a;
+}
+
 .toggle {
   display: inline-flex;
   align-items: center;
@@ -2270,6 +2395,10 @@
   .editor-tray {
     max-height: 24svh;
     padding: 8px 10px;
+  }
+
+  .mode-bar-right {
+    width: 100%;
   }
 
   .editor-tab {
