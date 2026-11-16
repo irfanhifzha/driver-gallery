@@ -220,10 +220,11 @@ src/
 ### UI behaviour
 
 - Grid: randomized masonry in explicit columns (3 columns, 2 below 1000px), so
-  every photo is shown **uncropped at its natural aspect ratio** while the
-  visible top-to-bottom order follows the selected sort. Cards reserve space
-  from `imageMediaMetadata` while loading; cards are real `<button>`s inside
-  the column divs.
+  every photo is shown **at its natural aspect ratio**, or at the saved crop's
+  ratio when one exists, while the visible top-to-bottom order follows the
+  selected sort. A saved crop also previews in the card (cover, with the crop's
+  pan and zoom). Cards reserve space from `imageMediaMetadata` while loading;
+  cards are real `<button>`s inside the column divs.
 - Card states: shimmer skeleton while loading, `onError` → filename tile (covers
   HEIC and expired thumbnails).
 - Lightbox: fixed overlay, `role="dialog"`, `aria-modal`, focus moved to the close
@@ -420,6 +421,37 @@ To raise the ceiling, change the default in `src/lib/drive.ts`
 widths such as `sz=w2400`, at the cost of a bigger download. Drive renders
 thumbnails through a separate pipeline though, so a larger `sz` is not
 guaranteed to be honoured for every file.
+
+### Recommended upgrade: progressive high-res in the lightbox
+
+Bumping the default is the quickest fix but every open pays for it. Better is
+to keep the fast preview and add a second layer on demand — **progressive
+loading**, not a bigger default:
+
+1. **Instant layer.** Keep `sz=w1600` (or even the grid's `=s800`) as the
+   immediate preview, so opening a photo never waits on a big download.
+2. **High-res layer.** Once the viewer settles (roughly 300–500 ms after open)
+   or the user zooms past ~1.5×, fetch a larger rendition in the background,
+   one photo at a time, and cross-fade it in. Two sources, in order:
+   - `thumbnailLink` rewritten to `=s0` (or `=s2560`) — the signed CDN URL,
+     usually the largest rendition, no referrer needed, no API quota.
+   - `https://www.googleapis.com/drive/v3/files/<id>?alt=media&key=…` for the
+     true original. It is the whole file (10–40 MB for a JPEG/RAW), so only
+     fetch it on an explicit "full resolution" action or extreme zoom — and
+     note that `alt=media` is a 200-unit download against the API quota.
+3. **Cache per file id in memory** (a `Map<id, url>` of preloaded images) and
+   don't re-fetch when navigating back to a photo in the same session.
+4. **Tie the zoom ceiling to loaded pixels.** For example cap viewer zoom at 4×
+   while only the 1600 px layer is in and 8× once the high-res layer arrives,
+   instead of advertising detail the browser does not have.
+5. **Keep the editor on the same texture.** The crop/colour preview should use
+   the high-res image too, otherwise a tight crop looks softer than the photo
+   around it.
+
+Costs to keep in mind: each high-res fetch is real bandwidth, Drive can answer
+`429` under load, and RAW-only files still have no browser-decodable rendition
+at any size. Load lazily, one photo at a time, and never preload high-res for
+neighbours.
 
 ## Supported image formats
 
