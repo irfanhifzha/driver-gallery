@@ -1,43 +1,31 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import './App.css'
-import { Filters } from './components/Filters'
-import { ImageGrid } from './components/ImageGrid'
-import { Lightbox } from './components/Lightbox'
-import { Pagination } from './components/Pagination'
-import {
-  EmptyState,
-  ErrorState,
-  LoadingGrid,
-  NoMatchesState,
-} from './components/States'
-import { Toolbar } from './components/Toolbar'
-import { config, configError } from './config'
-import { useDriveImages } from './hooks/useDriveImages'
-import { fileType, withoutRawDuplicates } from './lib/drive'
+import { FolderBar } from './components/FolderBar'
+import { Gallery } from './components/Gallery'
+import { ErrorState } from './components/States'
+import { apiKey, configError, defaultFolderId } from './config'
+import { parseFolderId } from './lib/drive'
 
-/** Photos per page. The full listing is cached, so paging is instant. */
-const PER_PAGE = 24
+const STORAGE_KEY = 'drive-gallery:folder'
+
+function readStoredFolder() {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    return stored ? parseFolderId(stored) : null
+  } catch {
+    return null
+  }
+}
 
 function App() {
-  const { images, loading, error, refresh } = useDriveImages()
-  const [page, setPage] = useState(1)
-  const [hideRaw, setHideRaw] = useState(true)
-  const [query, setQuery] = useState('')
-  const [type, setType] = useState('all')
-  const [openIndex, setOpenIndex] = useState<number | null>(null)
+  const [folderId, setFolderId] = useState(
+    () =>
+      readStoredFolder() ??
+      (defaultFolderId ? parseFolderId(defaultFolderId) : null) ??
+      '',
+  )
 
-  const types = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const image of images) {
-      const label = fileType(image)
-      counts.set(label, (counts.get(label) ?? 0) + 1)
-    }
-    return [...counts.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([label, count]) => ({ label, count }))
-  }, [images])
-
-  if (!config) {
+  if (!apiKey) {
     return (
       <div className="app">
         <ErrorState title="Configuration needed" message={configError ?? ''} />
@@ -45,146 +33,35 @@ function App() {
     )
   }
 
-  const needle = query.trim().toLowerCase()
-  const filtered = images.filter((image) => {
-    if (needle && !image.name.toLowerCase().includes(needle)) return false
-    if (type !== 'all' && fileType(image) !== type) return false
-    return true
-  })
-  const deduped = withoutRawDuplicates(filtered)
-  const duplicateCount = filtered.length - deduped.length
-  const shown = hideRaw ? deduped : filtered
-
-  const hasImages = shown.length > 0
-  const pageCount = Math.max(1, Math.ceil(shown.length / PER_PAGE))
-  const currentPage = Math.min(page, pageCount)
-  const start = (currentPage - 1) * PER_PAGE
-  const pageImages = shown.slice(start, start + PER_PAGE)
-  const activeIndex =
-    openIndex !== null && openIndex < pageImages.length ? openIndex : null
-
-  const resetPaging = () => {
-    setPage(1)
-    setOpenIndex(null)
-  }
-
-  const handleRefresh = () => {
-    resetPaging()
-    refresh()
-  }
-
-  const goToPage = (next: number) => {
-    setPage(next)
-    setOpenIndex(null)
-    window.scrollTo({ top: 0 })
-  }
-
-  const handleToggleHideRaw = (hide: boolean) => {
-    setHideRaw(hide)
-    resetPaging()
-  }
-
-  const handleQueryChange = (value: string) => {
-    setQuery(value)
-    resetPaging()
-  }
-
-  const handleTypeChange = (value: string) => {
-    setType(value)
-    resetPaging()
-  }
-
-  const handleResetFilters = () => {
-    setQuery('')
-    setType('all')
-    resetPaging()
+  const applyFolder = (next: string) => {
+    setFolderId(next)
+    try {
+      localStorage.setItem(STORAGE_KEY, next)
+    } catch {
+      // Private mode: the choice simply won't persist.
+    }
   }
 
   return (
     <div className="app">
-      <Toolbar
-        count={shown.length}
-        duplicateCount={duplicateCount}
-        hideRaw={hideRaw}
-        loading={loading}
-        onRefresh={handleRefresh}
-        onToggleHideRaw={handleToggleHideRaw}
+      <FolderBar
+        key={folderId}
+        folderId={folderId}
+        defaultFolderId={defaultFolderId}
+        onApply={applyFolder}
       />
 
-      <main>
-        {images.length > 0 ? (
-          <Filters
-            query={query}
-            type={type}
-            types={types}
-            onQueryChange={handleQueryChange}
-            onTypeChange={handleTypeChange}
-            onReset={handleResetFilters}
-          />
-        ) : null}
-
-        {loading && !hasImages ? <LoadingGrid /> : null}
-
-        {error && !hasImages ? (
-          <ErrorState message={error} onRetry={handleRefresh} />
-        ) : null}
-
-        {!loading && !error && images.length === 0 ? <EmptyState /> : null}
-
-        {!loading && !error && images.length > 0 && !hasImages ? (
-          <NoMatchesState onClear={handleResetFilters} />
-        ) : null}
-
-        {hasImages ? (
-          <>
-            <ImageGrid images={pageImages} onOpen={setOpenIndex} />
-
-            {pageCount > 1 ? (
-              <div className="pager-bar">
-                <p className="page-range">
-                  Showing {start + 1}–{start + pageImages.length} of{' '}
-                  {shown.length}
-                </p>
-                <Pagination
-                  page={currentPage}
-                  pageCount={pageCount}
-                  onPageChange={goToPage}
-                />
-              </div>
-            ) : null}
-
-            <div className="gallery-footer">
-              {error ? (
-                <p className="inline-error" role="alert">
-                  {error}
-                </p>
-              ) : null}
-              {loading && hasImages ? (
-                <p className="muted" role="status">
-                  Loading all photos…
-                </p>
-              ) : null}
-              <a
-                className="drive-link"
-                href={`https://drive.google.com/drive/folders/${config.folderId}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Open folder in Drive ↗
-              </a>
-            </div>
-          </>
-        ) : null}
-      </main>
-
-      {activeIndex !== null ? (
-        <Lightbox
-          images={pageImages}
-          index={activeIndex}
-          onIndexChange={setOpenIndex}
-          onClose={() => setOpenIndex(null)}
-        />
-      ) : null}
+      {folderId ? (
+        <Gallery key={folderId} folderId={folderId} />
+      ) : (
+        <div className="state">
+          <h2>Pick a folder</h2>
+          <p>
+            Paste a public Google Drive folder link or ID above to load its
+            photos.
+          </p>
+        </div>
+      )}
     </div>
   )
 }

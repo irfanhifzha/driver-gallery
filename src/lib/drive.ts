@@ -10,6 +10,15 @@ export type DriveImage = {
 };
 
 const API = "https://www.googleapis.com/drive/v3/files";
+
+/** Accepts a raw Drive folder ID or any link containing `/folders/<id>`. */
+export function parseFolderId(input: string) {
+  const value = input.trim();
+  if (!value) return null;
+  const fromUrl = value.match(/\/folders\/([A-Za-z0-9_-]+)/);
+  const candidate = fromUrl ? fromUrl[1] : value;
+  return /^[A-Za-z0-9_-]{10,}$/.test(candidate) ? candidate : null;
+}
 const FIELDS =
   "id,name,mimeType,size,modifiedTime,thumbnailLink,imageMediaMetadata(width,height)";
 
@@ -25,10 +34,14 @@ export class DriveError extends Error {
   }
 }
 
-export async function listImages(pageToken?: string, signal?: AbortSignal) {
+export async function listImages(
+  folderId: string,
+  pageToken?: string,
+  signal?: AbortSignal,
+) {
   const p = new URLSearchParams({
     key: import.meta.env.VITE_GOOGLE_API_KEY,
-    q: `'${import.meta.env.VITE_DRIVE_FOLDER_ID}' in parents and trashed = false and mimeType contains 'image/'`,
+    q: `'${folderId}' in parents and trashed = false and mimeType contains 'image/'`,
     fields: `nextPageToken,files(${FIELDS})`,
     pageSize: "1000",
     orderBy: "name_natural",

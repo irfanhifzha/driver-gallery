@@ -8,6 +8,64 @@
   gap: 28px;
 }
 
+/* ---------- Folder picker ---------- */
+
+.folder-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.folder-form {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.folder-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.folder-input {
+  flex: 1 1 320px;
+  min-width: 0;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--text-h);
+  padding: 10px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.folder-input::placeholder {
+  color: var(--text);
+  opacity: 0.85;
+}
+
+.folder-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+.folder-input[aria-invalid='true'] {
+  border-color: #c2544a;
+}
+
+.folder-error {
+  font-size: 13px;
+  color: #a4342a;
+}
+
 /* ---------- Header ---------- */
 
 .toolbar {
@@ -21,18 +79,10 @@
 }
 
 .toolbar h1 {
-  margin: 6px 0 0;
+  margin: 0;
   font-size: clamp(30px, 4vw, 42px);
   line-height: 1.1;
   letter-spacing: -0.01em;
-}
-
-.eyebrow {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--accent);
 }
 
 .subtitle {
@@ -142,6 +192,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
+  padding-bottom: 20px;
 }
 
 .search-field {
@@ -753,6 +804,14 @@
 
   .filters {
     gap: 10px;
+  }
+
+  .folder-form {
+    gap: 8px;
+  }
+
+  .folder-input {
+    flex-basis: 100%;
   }
 
   .search-field {

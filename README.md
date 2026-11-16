@@ -21,8 +21,9 @@ React 19 · TypeScript 7 · Vite 8 · oxlint. No runtime dependencies beyond Rea
 
 ## Setup
 
-Create `.env.local` in the project root (it is git-ignored via `*.local`) and put
-both values in it:
+Create `.env.local` in the project root (it is git-ignored via `*.local`). The
+API key is required; the folder ID is only the default shown on first load, since
+folders can be switched in the UI.
 
 ```
 VITE_GOOGLE_API_KEY=...
@@ -32,7 +33,7 @@ VITE_DRIVE_FOLDER_ID=...
 | Variable | Meaning |
 | --- | --- |
 | `VITE_GOOGLE_API_KEY` | Google Cloud API key, restricted to the Drive API and HTTP referrers (`http://localhost:5173/*`). |
-| `VITE_DRIVE_FOLDER_ID` | The `<id>` segment of `https://drive.google.com/drive/folders/<id>`. |
+| `VITE_DRIVE_FOLDER_ID` | Optional default folder: the `<id>` segment of `https://drive.google.com/drive/folders/<id>`. Can be changed per visit in the UI. |
 
 **Env loading:** Vite reads `.env.local`.
 A wrong or placeholder value here produces `400 API key not valid` straight from
@@ -51,11 +52,13 @@ npm run preview  # serve dist/
 
 ```
 src/
-├─ config.ts                  # env reads + validation; exports config | null and configError
+├─ config.ts                  # apiKey (required), defaultFolderId (optional), configError
 ├─ lib/drive.ts               # the ONLY module that knows Google exists
 │                              #   + RAW/JPEG duplicate helpers
 ├─ hooks/useDriveImages.ts    # fetch lifecycle, auto-pagination, full-listing cache
 ├─ components/
+│  ├─ FolderBar.tsx           # folder link/ID input, validation, "Use default"
+│  ├─ Gallery.tsx             # per-folder container: toolbar, filters, grid, pager
 │  ├─ Toolbar.tsx             # title, photo count, RAW toggle, refresh
 │  ├─ Filters.tsx             # file-name search + file-type select + reset
 │  ├─ ImageGrid.tsx           # <ul> grid of cards
@@ -63,16 +66,18 @@ src/
 │  ├─ Lightbox.tsx            # full-size view, ←/→/Esc, focus trap, scroll lock
 │  ├─ Pagination.tsx          # Prev/Next + numbered pages (24 per page)
 │  └─ States.tsx              # LoadingGrid / EmptyState / ErrorState
-├─ App.tsx                    # composes the above; owns lightbox index
+├─ App.tsx                    # shell: resolves/persists the folder, mounts Gallery
 ├─ App.css                    # gallery, paging, states, lightbox + zoom styling
 └─ index.css                  # warm light-theme tokens, base element styles
 ```
 
 ### Data flow
 
-1. `config.ts` reads the two `VITE_` vars at build time. If either is missing,
-   `config` is `null`, `useDriveImages` never fetches, and `App` renders a
-   "Configuration needed" state.
+1. `App` resolves the folder in this order: `localStorage["drive-gallery:folder"]
+   → VITE_DRIVE_FOLDER_ID → empty prompt`. Only the API key is mandatory; if it
+   is missing, a "Configuration needed" state is shown and nothing fetches.
+   `Gallery` is keyed by the folder ID, so switching folders remounts it and
+   resets paging, filters, the lightbox, and the hook's cache lookup.
 2. `useDriveImages` looks for a fresh (<5 min) **complete** listing in
    `sessionStorage["drive-gallery:<folderId>"]` during the first render.
    - Cache hit → images are available immediately, no request.
@@ -163,6 +168,24 @@ exists**, so NEF+JPG pairs show once and lone RAW shots stay visible. Matching i
   lightbox, zoom). No CSS framework or CSS-in-JS.
 - The Vite template's demo styles and assets were removed; only `favicon.svg`
   remains in `public/`.
+
+## Switching folders
+
+The folder bar above the gallery accepts either a raw Drive folder ID or a pasted
+link containing `/folders/<id>` (e.g.
+`https://drive.google.com/drive/folders/1AbC...`). **Load folder** validates it,
+stores it in `localStorage["drive-gallery:folder"]`, and remounts the gallery for
+that folder. **Use default** appears when the current folder differs from
+`VITE_DRIVE_FOLDER_ID`.
+
+- The folder must be public (**Anyone with the link → Viewer**); being shared
+  with your account only is not enough for the API-key model.
+- Invalid input shows an inline error and leaves the current folder untouched.
+- Listings are cached per folder for 5 minutes, so switching back to a folder
+  you just viewed is instant. Filters, paging, and the lightbox reset on switch.
+- The stored folder wins over the env default on reload; clear the
+  `drive-gallery:folder` key (or press **Use default**) to go back.
+- This is read-only: the app never modifies the folder or its sharing.
 
 ## Smoke-testing the Drive setup
 

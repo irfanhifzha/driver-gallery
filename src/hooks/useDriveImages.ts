@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { config, configError } from '../config'
 import { DriveError, listImages, type DriveImage } from '../lib/drive'
 
 /** Listings are cheap, but the API key is shared by every visitor — spare the quota. */
@@ -60,16 +59,15 @@ function shuffle<T>(items: T[]) {
   return copy
 }
 
-export function useDriveImages() {
-  const folderId = config?.folderId
-
+export function useDriveImages(folderId: string) {
   // Read the cached listing during the first render so a repeat visit paints
-  // immediately, with no extra effect round-trip.
-  const [cached] = useState(() => (folderId ? readCache(folderId) : null))
+  // immediately, with no extra effect round-trip. The gallery is remounted per
+  // folder, so this only has to run for the folder currently being shown.
+  const [cached] = useState(() => readCache(folderId))
 
   const [images, setImages] = useState<DriveImage[]>(cached?.images ?? [])
-  const [loading, setLoading] = useState(Boolean(folderId) && !cached)
-  const [error, setError] = useState<string | null>(configError)
+  const [loading, setLoading] = useState(!cached)
+  const [error, setError] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   /**
@@ -89,7 +87,7 @@ export function useDriveImages() {
 
     try {
       for (let page = 0; page < MAX_PAGES; page += 1) {
-        const data = await listImages(token, controller.signal)
+        const data = await listImages(folderId, token, controller.signal)
         if (controller.signal.aborted) return
 
         collected.push(...shuffle(data.files ?? []))
