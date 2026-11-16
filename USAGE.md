@@ -1,0 +1,147 @@
+# USAGE — what actually happens when this site runs
+
+A plain-language map of everything the gallery does at runtime: what it calls,
+what it stores, what it renders, and what it never does. For setup see
+[`README.md`](./README.md); for design notes see
+[`react-vite-drive-gallery-plan.md`](./react-vite-drive-gallery-plan.md).
+
+## At a glance
+
+- **Static client-side app.** Vite builds HTML/CSS/JS; there is no backend, no
+  database, no server process, and no accounts or logins.
+- **One kind of Google call:** `files.list` on the chosen public folder. No
+  per-file requests, no downloads through the API, no writes.
+- **Images** come from Google's thumbnail CDN using signed URLs, which are not
+  API calls and cost no quota.
+- **State** lives in `localStorage` (chosen folder) and `sessionStorage` (listing
+  cache) plus in-memory React state. No app cookies, no service worker, no
+  analytics, no IndexedDB.
+
+## A normal visit, step by step
+
+1. **Load the page.** The host serves `index.html` and the built JS/CSS. The app
+   reads `localStorage["drive-gallery:folder"]`.
+   - Nothing stored → shows the folder bar and a "Pick a folder" prompt. **No
+     Google request is made.**
+   - Stored folder → jumps straight to step 3 for that folder.
+2. **Paste a folder link or ID and press Load folder.** The ID is extracted,
+   saved to `localStorage`, and `Gallery` remounts for that folder.
+3. **Fetch the listing.** The app calls Drive `files.list` with the API key,
+   `q = '<folderId>' in parents and trashed = false and mimeType contains 'image/'`,
+   `pageSize=1000`, and a narrow `fields` list (name, MIME type, size, modified
+   time, thumbnail link, image metadata incl. EXIF). If Drive returns a
+   `nextPageToken`, further pages are fetched automatically (max 50 pages =
+   ~50,000 files). Each page is appended as it arrives, so photos appear
+   progressively.
+4. **Cache the result.** Once the listing is complete it is written to
+   `sessionStorage["drive-gallery:listing:<folderId>"]` with a timestamp. A
+   repeat visit within 5 minutes reads that cache instead of calling Drive.
+5. **Shuffle.** The listing is shuffled in memory so the masonry pattern differs
+   per load. Only the complete listing is cached; the shuffle happens at read.
+6. **Render.** 24 photos per page are laid out as a CSS-columns masonry. Filters,
+   search, RAW-duplicate hiding, and pagination are all done in the browser over
+   the cached array — no extra requests.
+7. **Grid images.** Each card renders `thumbnailLink` as `srcSet` candidates
+   (`=s400`, `=s800`, `=s1600`) with a tuned `sizes`, `loading="lazy"`, and
+   `decoding="async"`. The browser picks a size for the column width. These are
+   Google CDN requests, not Drive API calls.
+8. **Open a photo.** The lightbox requests
+   `drive.google.com/thumbnail?id=…&sz=w1600` (`fullSrc`) and preloads the two
+   neighbours at the same size.
+9. **Zoom.** CSS `transform: translate() scale()` on the already-loaded bitmap,
+   1×–5×. Zooming does **not** download anything new.
+10. **Adjust.** Brightness/contrast/saturation are a CSS `filter`; white balance
+    and tint are blend overlays inside the zoom transform. Preview only — no
+    request, no upload, no saved file. Settings reset when changing photos and
+    when the viewer closes.
+11. **Info.** The metadata panel is built from the listing already in memory —
+    no request.
+12. **Open in Drive.** A normal link to `drive.google.com/drive/folders/<id>`;
+    the app makes no request, Google's own page handles it.
+13. **Refresh.** Clears the folder's session cache, empties the grid, and starts
+    a fresh listing call (one API call per 1000 files again).
+
+## Network calls
+
+| Destination | When | Counts against Drive API quota? |
+| --- | --- | --- |
+| Your static host | Page load, CSS/JS | No (host's own logs) |
+| `www.googleapis.com/drive/v3/files` | Folder load / Refresh | **Yes** — 100 quota units per page |
+| `lh3.googleusercontent.com` | Grid thumbnails | No — signed CDN URL, no key |
+| `drive.google.com/thumbnail` | Lightbox image + neighbour preloads | No — no API key involved |
+| `drive.google.com/*` | Only if you click a Drive link | No |
+
+## API quota, in practice
+
+- One `files.list` per 1000 files = **100 quota units**. A 70-photo folder is a
+  single call, then cached for 5 minutes per tab.
+- Current published limits (2026): 1,000,000 units/min per project, 325,000
+  units/min per user per project, a 400,000,000 units/day billing threshold, and
+  1 TB/day of API egress. This app never uses API downloads (`alt=media`), so the
+  egress limit is untouched.
+- 4,000,000 folder loadings/day would be needed to reach the daily threshold.
+  Details and the "keep it free" advice are in the README's *Cost and free
+  limits* section.
+- Images can still answer `429`, but that is Google's referrer check on the
+  thumbnail CDN, not your API quota. It is why every `<img>` keeps
+  `referrerPolicy="no-referrer"`.
+
+## Browser storage
+
+| Key | Store | Lifetime | What is in it |
+| --- | --- | --- | --- |
+| `drive-gallery:folder` | `localStorage` | Until cleared | Folder ID last loaded (wins over everything on reload) |
+| `drive-gallery:listing:<folderId>` | `sessionStorage` | 5 minutes, per tab | `{ storedAt, images: [...] }` — the complete listing incl. metadata |
+
+- `sessionStorage` is typically ~5 MB per origin. A very large folder's JSON may
+  exceed that; `writeCache` then fails silently and the next reload refetches.
+- Only complete listings are cached (a leftover `nextPageToken` makes
+  `readCache` reject the entry).
+- Clearing `drive-gallery:folder` returns the app to the "Pick a folder" prompt.
+- The app sets no cookies, uses no `localStorage` beyond the folder key, and
+  registers no service worker, so there is no offline mode.
+
+## Client-side work (no server involved)
+
+- **Search** is a case-insensitive substring match on file names, recomputed as
+  you type over the in-memory list.
+- **Type filter** options and counts are derived from the listing.
+- **RAW de-duplication** hides RAW files whose base name has a matching JPEG;
+  lone RAW files stay visible.
+- **Pagination** slices the filtered array into 24-photo pages; page changes are
+  instant and scroll to top.
+- **Masonry** is CSS `column-count` (3 columns, 2 under 1000 px), with each card
+  reserving space from `imageMediaMetadata` width/height to avoid layout jumps.
+
+## Privacy and data flow
+
+- Your folder ID is stored locally and appears in Drive links you click.
+- The API key is compiled into the public bundle (visible in DevTools); it is
+  protected only by HTTP-referrer and API restrictions in Google Cloud.
+- Photo data goes browser ↔ Google. Nothing is sent to the site owner; only the
+  static host sees asset requests.
+- No upload, edit, delete, move, or sharing change is ever performed. The app is
+  read-only.
+- Google's own pages (Drive) may set their own cookies when you open them; that
+  is outside this app.
+
+## Limits and failure modes
+
+| Symptom | Likely cause |
+| --- | --- |
+| `400 API key not valid` | Wrong/placeholder key in `.env.local`, or the dev server started before it existed |
+| `403` on listing | Key restriction (referrer/API) or folder not shared "Anyone with the link" |
+| `429` on an image | Referrer sent to the thumbnail CDN, or an expired/limited signed URL |
+| Filename tile instead of a photo | Both thumbnail and fallback failed (unsupported format, missing thumbnail, expired URL) |
+| Nothing loads in a new tab | `429` from the CDN because the tab navigates with a referrer; reload or paste the URL fresh |
+| Cache seems stale | 5-minute listing TTL — press **Refresh** |
+| Very large folder slow | Every page is fetched up front; the listing itself is the cost, plus JSON over the 5 MB cache budget |
+
+## Where the behaviour lives
+
+- `src/lib/drive.ts` — the API call, field list, URL builders, RAW helpers.
+- `src/hooks/useDriveImages.ts` — cache, auto-pagination, shuffle, refresh.
+- `src/components/Gallery.tsx` — filters, RAW toggle, pagination, page state.
+- `src/components/Lightbox.tsx` — viewer, zoom, adjustments, info panel.
+- `src/lib/adjustments.ts` — filter string, white balance/tint overlays.
+- `src/lib/metadata.ts` — EXIF/size formatting for the info panel.

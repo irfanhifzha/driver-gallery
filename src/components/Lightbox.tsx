@@ -5,6 +5,7 @@ import {
   DEFAULT_ADJUSTMENTS,
   filterCss,
   hasAdjustments,
+  whiteBalanceOverlay,
   type Adjustments,
 } from '../lib/adjustments'
 import { AdjustPanel } from './AdjustPanel'
@@ -333,6 +334,8 @@ export function Lightbox({
 
   if (!image) return null
 
+  const whiteBalanceStyle = whiteBalanceOverlay(adjustments)
+
   return (
     <div
       ref={dialogRef}
@@ -462,6 +465,13 @@ export function Lightbox({
                     background: `hsl(${adjustments.tintHue} 80% 50%)`,
                     opacity: adjustments.tintStrength / 100,
                   }}
+                />
+              ) : null}
+              {whiteBalanceStyle ? (
+                <span
+                  className="lightbox-wb"
+                  aria-hidden="true"
+                  style={whiteBalanceStyle}
                 />
               ) : null}
             </div>

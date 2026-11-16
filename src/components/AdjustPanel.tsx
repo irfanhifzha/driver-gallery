@@ -5,6 +5,7 @@ const CONTROLS = [
   { key: 'brightness', label: 'Brightness', min: 50, max: 150, unit: '%' },
   { key: 'contrast', label: 'Contrast', min: 50, max: 150, unit: '%' },
   { key: 'saturation', label: 'Saturation', min: 0, max: 200, unit: '%' },
+  { key: 'whiteBalance', label: 'White balance', min: -100, max: 100, unit: '' },
   { key: 'tintHue', label: 'Tint hue', min: 0, max: 360, unit: '°' },
   { key: 'tintStrength', label: 'Tint strength', min: 0, max: 100, unit: '%' },
 ] as const
@@ -56,7 +57,9 @@ export function AdjustPanel({
               >
                 <span>{control.label}</span>
                 <span className="adjust-value">
-                  {value}
+                  {control.key === 'whiteBalance' && value > 0
+                    ? `+${value}`
+                    : value}
                   {control.unit}
                 </span>
               </label>
@@ -67,9 +70,13 @@ export function AdjustPanel({
                 max={control.max}
                 step={1}
                 value={value}
-                aria-valuetext={`${value} ${
-                  control.unit === '°' ? 'degrees' : 'percent'
-                }`}
+                aria-valuetext={
+                  control.key === 'whiteBalance'
+                    ? `${value} ${
+                        value === 0 ? 'neutral' : value > 0 ? 'warmer' : 'cooler'
+                      }`
+                    : `${value} ${control.unit === '°' ? 'degrees' : 'percent'}`
+                }
                 onChange={(event) =>
                   onChange({
                     [control.key]: Number(event.target.value),
@@ -83,6 +90,12 @@ export function AdjustPanel({
 
       <p className="adjust-code">
         <span>filter: {filterCss(values)}</span>
+        {values.whiteBalance !== 0 ? (
+          <span>
+            white balance: {values.whiteBalance > 0 ? '+' : ''}
+            {values.whiteBalance} ({values.whiteBalance > 0 ? 'warmer' : 'cooler'})
+          </span>
+        ) : null}
         {values.tintStrength > 0 ? (
           <span>
             tint: hsl({values.tintHue} 80% 50%) · {values.tintStrength}%

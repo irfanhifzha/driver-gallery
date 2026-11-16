@@ -9,6 +9,8 @@ editor.
   browser uses a **referrer-restricted API key**.
 - Full design rationale, quotas, and upgrade paths live in
   [`react-vite-drive-gallery-plan.md`](./react-vite-drive-gallery-plan.md).
+- What the site actually does at runtime — API calls, cache keys, storage,
+  privacy — is mapped in [`USAGE.md`](./USAGE.md).
 - If the folder ever becomes private, swap the API-key call in
   `src/lib/drive.ts` for an `Authorization: Bearer` header (plan §10). Components
   do not need to change.
@@ -219,10 +221,11 @@ src/
   square corners and fills the viewport height; the filename, position, zoom
   factor, and control hint sit in a top-left overlay instead of under the image.
 - Live adjustments: **Adjust** opens a panel with brightness (50–150 %),
-  contrast (50–150 %), saturation (0–200 %), tint hue (0–360°) and tint strength
-  (0–100 %) sliders. Changes render instantly: a `filter` chain on the image plus
-  a `mix-blend-mode: color` overlay for tint, both inside the zoom transform so
-  they follow pan/zoom. The panel shows the live values and generated
+  contrast (50–150 %), saturation (0–200 %), white balance (−100 cooler … +100
+  warmer), tint hue (0–360°) and tint strength (0–100 %) sliders. Changes render
+  instantly: a `filter` chain on the image, a `mix-blend-mode: soft-light`
+  overlay for white balance, and a `mix-blend-mode: color` overlay for tint, all
+  inside the zoom transform so they follow pan/zoom. The panel shows the live values and generated
   `filter: …` string, with Reset, and is preview-only — nothing is saved,
   exported, or written to Drive. Esc closes the panel before the viewer, and
   settings reset when changing photos.

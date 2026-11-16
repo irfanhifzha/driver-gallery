@@ -697,6 +697,13 @@
   mix-blend-mode: color;
 }
 
+.lightbox-wb {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: soft-light;
+}
+
 .lightbox-meta {
   position: absolute;
   top: 18px;
