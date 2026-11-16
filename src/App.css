@@ -1077,6 +1077,8 @@
   --lightbox-photo-max-height: calc(
     100svh - (var(--lightbox-meta-bottom) + var(--lightbox-gap)) * 2
   );
+  /* JS writes the measured editor dock height here. */
+  --editor-dock-height: 0px;
   position: fixed;
   inset: 0;
   z-index: 50;
@@ -1084,6 +1086,17 @@
   align-items: center;
   justify-content: center;
   padding: var(--lightbox-gap);
+}
+
+/* Editor mode: the photo is centred in the band between the meta row and the
+   dock, so neither the dock nor the icon row covers it. */
+.lightbox.is-editing {
+  padding-top: calc(var(--lightbox-meta-bottom) + var(--lightbox-gap));
+  padding-bottom: calc(var(--lightbox-gap) + var(--editor-dock-height) + 4px);
+  --lightbox-photo-max-height: calc(
+    100svh - var(--lightbox-meta-bottom) - var(--editor-dock-height) -
+      (var(--lightbox-gap) * 2) - 4px
+  );
 }
 
 .lightbox-backdrop {
@@ -1700,6 +1713,167 @@
   outline-offset: 3px;
 }
 
+/* ---------- Editor dock (bottom tool bar) ---------- */
+
+.editor-dock {
+  position: absolute;
+  left: 50%;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: min(760px, calc(100% - 24px));
+  transform: translateX(-50%);
+  /* Only the tray and tabs should catch clicks, not the gaps around them. */
+  pointer-events: none;
+}
+
+.editor-tray,
+.editor-tabs {
+  pointer-events: auto;
+}
+
+.editor-tray {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-height: min(42svh, 340px);
+  padding: 14px 16px;
+  overflow-y: auto;
+  color: #f3f4f6;
+  background: rgba(24, 21, 18, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(16px);
+}
+
+.editor-tray-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.editor-tray-head h2 {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #cfc9bf;
+}
+
+.editor-tray-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editor-reset {
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 11.5px;
+  color: #d9d4ca;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.editor-reset:hover:not(:disabled) {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.editor-reset:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.editor-reset:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.editor-sliders {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px 20px;
+}
+
+/* The crop block is already a card section in the view panel; inside the tray
+   it is just a group of rows. */
+.editor-tray .crop-block {
+  padding-top: 0;
+  border-top: none;
+}
+
+.crop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.editor-status {
+  margin: 0;
+  font-size: 11.5px;
+  color: #a9a49b;
+}
+
+.editor-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 5px;
+  background: rgba(24, 21, 18, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  box-shadow: 0 18px 40px -26px rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(16px);
+}
+
+.editor-tab {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 16px;
+  font: inherit;
+  font-size: 11px;
+  color: #c9c3b9;
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.editor-tab svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.editor-tab:hover:not([aria-pressed='true']) {
+  color: #fff;
+}
+
+.editor-tab[aria-pressed='true'] {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.editor-tab:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
 .adjust-note {
   font-size: 11.5px;
   color: rgba(243, 244, 246, 0.55);
@@ -2042,5 +2216,24 @@
   .lightbox-nav svg {
     width: 20px;
     height: 20px;
+  }
+
+  .editor-dock {
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    width: calc(100% - 20px);
+  }
+
+  .editor-tray {
+    max-height: 34svh;
+    padding: 12px 14px;
+  }
+
+  .editor-tab {
+    padding: 6px 12px;
+  }
+
+  /* The dock covers the bottom corners, so the arrows move above it. */
+  .lightbox.is-editing .lightbox-nav {
+    bottom: calc(var(--editor-dock-height) + 20px);
   }
 }

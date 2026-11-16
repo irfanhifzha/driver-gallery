@@ -15,6 +15,7 @@ import {
 import { clampCrop, type Crop } from '../lib/crop'
 import type { EditMap, PhotoEdit } from '../lib/edits'
 import { AdjustPanel } from './AdjustPanel'
+import { EditorDock, type EditorTool } from './EditorDock'
 import { InfoPanel } from './InfoPanel'
 import type { GalleryMode } from './ModeBar'
 import { metadataRows } from '../lib/metadata'
@@ -50,6 +51,7 @@ type LightboxProps = {
   /** Saved crop/colour per file id, read from localStorage by the gallery. */
   edits: EditMap
   onSaveEdit: (id: string, edit: PhotoEdit) => void
+  onClearEdit: (id: string) => void
   onIndexChange: (index: number) => void
   onToggleFavorite: (image: DriveImage) => void
   onClose: () => void
@@ -62,6 +64,7 @@ export function Lightbox({
   mode,
   edits,
   onSaveEdit,
+  onClearEdit,
   onIndexChange,
   onToggleFavorite,
   onClose,
@@ -98,6 +101,7 @@ export function Lightbox({
   const settleTimerRef = useRef<number | undefined>(undefined)
 
   const metaRef = useRef<HTMLDivElement>(null)
+  const dockRef = useRef<HTMLDivElement>(null)
   const adjustButtonRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLElement>(null)
   const infoButtonRef = useRef<HTMLButtonElement>(null)
@@ -118,6 +122,7 @@ export function Lightbox({
   const [crop, setCrop] = useState<Crop | null>(() => savedEdit?.crop ?? null)
   const [dirty, setDirty] = useState(false)
   const [cropping, setCropping] = useState(false)
+  const [tool, setTool] = useState<EditorTool>('light')
   const cropDragRef = useRef<{
     pointerId: number
     startX: number
@@ -157,11 +162,18 @@ export function Lightbox({
     settleTimerRef.current = window.setTimeout(() => setSettling(false), 220)
   }, [])
 
-  const resetAdjustments = useCallback(() => {
+  /** View-mode panel: drop the preview, leave any saved edit untouched. */
+  const resetPreview = useCallback(() => {
+    setAdjustments(DEFAULT_ADJUSTMENTS)
+  }, [])
+
+  /** Editor reset also deletes the saved entry, so the "Edited" cue clears. */
+  const resetEdit = useCallback(() => {
     setAdjustments(DEFAULT_ADJUSTMENTS)
     setCrop(null)
-    setDirty(true)
-  }, [])
+    setDirty(false)
+    if (image) onClearEdit(image.id)
+  }, [image, onClearEdit])
 
   const updateAdjustments = useCallback((patch: Partial<Adjustments>) => {
     setAdjustments((prev) => ({ ...prev, ...patch }))
@@ -317,6 +329,22 @@ export function Lightbox({
       window.removeEventListener('resize', update)
     }
   }, [image?.id])
+
+  // The dock is the photo's floor in editor mode: publish its height so the
+  // photo shrinks to the space above it and the mobile arrows sit above it.
+  useEffect(() => {
+    const dock = dockRef.current
+    const dialog = dialogRef.current
+    if (!dock || !dialog) return
+
+    const update = () =>
+      dialog.style.setProperty('--editor-dock-height', `${dock.offsetHeight}px`)
+
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(dock)
+    return () => observer.disconnect()
+  }, [mode, adjustOpen])
 
   // Lock body scroll, move focus in, and give it back on close.
   useEffect(() => {
@@ -743,11 +771,12 @@ export function Lightbox({
   if (!image) return null
 
   const whiteBalanceStyle = whiteBalanceOverlay(adjustments)
+  const editingOpen = mode === 'editor' && adjustOpen && !failed
 
   return (
     <div
       ref={dialogRef}
-      className="lightbox"
+      className={`lightbox${editingOpen ? ' is-editing' : ''}`}
       role="dialog"
       aria-modal="true"
       aria-label={`Image ${index + 1} of ${images.length}: ${image.name}`}
@@ -1039,18 +1068,30 @@ export function Lightbox({
         </svg>
       </button>
 
-      {adjustOpen && !failed ? (
+      {editingOpen ? (
+        <EditorDock
+          tool={tool}
+          onToolChange={setTool}
+          values={adjustments}
+          crop={crop}
+          dirty={dirty}
+          hasSaved={edited}
+          dockRef={dockRef}
+          onChange={updateAdjustments}
+          onCropChange={updateCrop}
+          onReset={resetEdit}
+          onSave={saveEdit}
+          onClose={closeAdjust}
+        />
+      ) : null}
+
+      {adjustOpen && !editingOpen && !failed ? (
         <AdjustPanel
           id={PANEL_ID}
           panelRef={panelRef}
           values={adjustments}
-          crop={crop}
-          mode={mode}
-          dirty={dirty}
           onChange={updateAdjustments}
-          onCropChange={updateCrop}
-          onReset={resetAdjustments}
-          onSave={saveEdit}
+          onReset={resetPreview}
           onClose={closeAdjust}
         />
       ) : null}

@@ -228,6 +228,14 @@ export function Gallery({ folderId }: GalleryProps) {
     writeEdits(next)
   }
 
+  const handleClearEdit = (id: string) => {
+    if (!edits[id]) return
+    const next = { ...edits }
+    delete next[id]
+    setEdits(next)
+    writeEdits(next)
+  }
+
   const handleResetFilters = () => {
     setQuery('')
     setType('all')
@@ -345,6 +353,7 @@ export function Gallery({ folderId }: GalleryProps) {
           mode={mode}
           edits={edits}
           onSaveEdit={handleSaveEdit}
+          onClearEdit={handleClearEdit}
           onIndexChange={setOpenIndex}
           onToggleFavorite={handleToggleFavorite}
           onClose={() => setOpenIndex(null)}
