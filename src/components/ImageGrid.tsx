@@ -89,8 +89,7 @@ export function ImageGrid({
               image={image}
               index={index}
               isFavorite={Boolean(favorites[image.id])}
-              isEdited={Boolean(edits[image.id])}
-              crop={edits[image.id]?.crop ?? null}
+              edit={edits[image.id] ?? null}
               onOpen={onOpen}
               onToggleFavorite={onToggleFavorite}
             />

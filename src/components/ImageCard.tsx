@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import type { Crop } from '../lib/crop'
+import {
+  filterCss,
+  hasAdjustments,
+  whiteBalanceOverlay,
+} from '../lib/adjustments'
+import type { PhotoEdit } from '../lib/edits'
 import {
   aspectRatio,
   fullSrc,
@@ -14,9 +19,8 @@ type ImageCardProps = {
   image: DriveImage
   index: number
   isFavorite: boolean
-  isEdited: boolean
-  /** Saved crop, previewed so a card matches the lightbox. */
-  crop: Crop | null
+  /** Saved edit, previewed so a card matches the lightbox. */
+  edit: PhotoEdit | null
   onOpen: (index: number) => void
   onToggleFavorite: (image: DriveImage) => void
 }
@@ -28,11 +32,16 @@ export function ImageCard({
   image,
   index,
   isFavorite,
-  isEdited,
-  crop,
+  edit,
   onOpen,
   onToggleFavorite,
 }: ImageCardProps) {
+  const crop = edit?.crop ?? null
+  const isEdited = Boolean(edit)
+  const adjust = edit?.adjust
+  const wbStyle = adjust ? whiteBalanceOverlay(adjust) : null
+  const activeFilter =
+    adjust && hasAdjustments(adjust) ? filterCss(adjust) : undefined
   // 'failed' covers unrenderable formats and files Drive cannot thumbnail.
   const [status, setStatus] = useState<'loading' | 'ready' | 'failed'>('loading')
   const [attempt, setAttempt] = useState(0)
@@ -97,11 +106,16 @@ export function ImageCard({
             referrerPolicy="no-referrer"
             className={crop ? 'is-cropped' : undefined}
             style={
-              crop
+              crop || activeFilter
                 ? ({
-                    '--crop-x': crop.x,
-                    '--crop-y': crop.y,
-                    '--crop-zoom': crop.zoom,
+                    ...(crop
+                      ? {
+                          '--crop-x': crop.x,
+                          '--crop-y': crop.y,
+                          '--crop-zoom': crop.zoom,
+                        }
+                      : {}),
+                    ...(activeFilter ? { filter: activeFilter } : {}),
                   } as CSSProperties)
                 : undefined
             }
@@ -111,6 +125,19 @@ export function ImageCard({
         ) : (
           <span className="fallback">{image.name}</span>
         )}
+        {adjust && adjust.tintStrength > 0 ? (
+          <span
+            className="card-tint"
+            aria-hidden="true"
+            style={{
+              background: `hsl(${adjust.tintHue} 80% 50%)`,
+              opacity: adjust.tintStrength / 100,
+            }}
+          />
+        ) : null}
+        {wbStyle ? (
+          <span className="card-wb" aria-hidden="true" style={wbStyle} />
+        ) : null}
         {status !== 'failed' ? (
           <span className="card-caption" aria-hidden="true">
             {image.name}

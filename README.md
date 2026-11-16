@@ -222,9 +222,12 @@ src/
 - Grid: randomized masonry in explicit columns (3 columns, 2 below 1000px), so
   every photo is shown **at its natural aspect ratio**, or at the saved crop's
   ratio when one exists, while the visible top-to-bottom order follows the
-  selected sort. A saved crop also previews in the card (cover, with the crop's
-  pan and zoom). Cards reserve space from `imageMediaMetadata` while loading;
-  cards are real `<button>`s inside the column divs.
+  selected sort. A saved edit previews in the card too: the crop sets the card's
+  shape (cover, with the crop's pan and zoom), and colour/light reuse the same
+  `filter` chain plus temperature/tint blend overlays as the viewer, so a tile
+  matches the photo before you open it. Cards reserve space from
+  `imageMediaMetadata` while loading; cards are real `<button>`s inside the
+  column divs.
 - Card states: shimmer skeleton while loading, `onError` → filename tile (covers
   HEIC and expired thumbnails).
 - Lightbox: fixed overlay, `role="dialog"`, `aria-modal`, focus moved to the close
@@ -642,6 +645,7 @@ the current model (public folder, API key, static site, no backend).
 ### Near term (small, no new services)
 
 - Remembering the sort choice across reloads.
+- **Double-click a slider to reset it to defaults** (e.g. temperature → 0, brightness → 100%).
 - Persist adjustments per photo in `localStorage`, or export a processed image.
   Export needs canvas + CORS, and the thumbnail hosts are unlikely to allow
   `crossOrigin="anonymous"`, so it may require a same-origin proxy.

@@ -906,6 +906,7 @@
 
 .card {
   position: relative;
+  isolation: isolate;
   display: block;
   width: 100%;
   padding: 0;
@@ -1374,14 +1375,16 @@ in   view mode the crop is just a preview and keeps the zoom cursor. */
   -webkit-user-drag: none;
 }
 
-.lightbox-tint {
+.lightbox-tint,
+.card-tint {
   position: absolute;
   inset: 0;
   pointer-events: none;
   mix-blend-mode: color;
 }
 
-.lightbox-wb {
+.lightbox-wb,
+.card-wb {
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -1951,16 +1954,16 @@ in   view mode the crop is just a preview and keeps the zoom cursor. */
   padding: 5px 10px;
   font: inherit;
   font-size: 11px;
-  color: #d9d4ca;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #b00;
+  background: rgba(255, 50, 50, 0.1);
+  border: 1px solid rgba(255, 50, 50, 0.3);
   border-radius: 999px;
   cursor: pointer;
 }
 
 .editor-reset:hover:not(:disabled) {
   color: #fff;
-  background: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 50, 50, 0.25);
 }
 
 .editor-reset:disabled {
@@ -1971,6 +1974,17 @@ in   view mode the crop is just a preview and keeps the zoom cursor. */
 .editor-reset:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 2px;
+}
+
+/* Visual warning when the reset removes the saved edit */
+.editor-reset.applied {
+  animation: resetWarn 0.4s ease forwards;
+}
+
+@keyframes resetWarn {
+  0%   { background: rgba(255, 50, 50, 0.1); }
+  50%  { background: rgba(255, 50, 50, 0.4); }
+  100% { background: rgba(255, 50, 50, 0.6); }
 }
 
 .editor-sliders {

@@ -1,5 +1,7 @@
+import { useCallback } from 'react'
 import type { Adjustments } from '../lib/adjustments'
 import type { AdjustControl } from '../lib/adjustmentControls'
+import { DEFAULT_ADJUSTMENTS } from '../lib/adjustments'
 
 type AdjustSliderProps = {
   control: AdjustControl
@@ -12,6 +14,9 @@ export function AdjustSlider({
   value,
   onChange,
 }: AdjustSliderProps) {
+  const resetToDefault = useCallback(() =>
+    onChange({ [control.key]: DEFAULT_ADJUSTMENTS[control.key] } as Partial<Adjustments>),
+  [])
   return (
     <div className="adjust-control">
       <label className="adjust-label" htmlFor={`adjust-${control.key}`}>
@@ -40,6 +45,7 @@ export function AdjustSlider({
             [control.key]: Number(event.target.value),
           } as Partial<Adjustments>)
         }
+        onDoubleClick={resetToDefault}
       />
     </div>
   )

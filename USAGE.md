@@ -51,9 +51,10 @@ what it stores, what it renders, and what it never does. For setup see
 7. **Grid images.** Each card renders `thumbnailLink` as `srcSet` candidates
    (`=s400`, `=s800`, `=s1600`) with a tuned `sizes`, `loading="lazy"`, and
    `decoding="async"`. The browser picks a size for the column width. A saved
-   crop is previewed in the card too: the card takes the crop's ratio and the
-   thumbnail is drawn with the crop's pan/zoom. These are Google CDN requests,
-   not Drive API calls.
+   edit is previewed in the card too: the card takes the crop's ratio and the
+   thumbnail is drawn with the crop's pan/zoom, while colour/light reuse the
+   viewer's `filter` chain and temperature/tint blend overlays. These are Google
+   CDN requests, not Drive API calls, and previewing an edit adds no request.
 8. **Open a photo.** The lightbox requests the same signed CDN link at
    `=w1600` (`bestSrc`, a width request, so portraits keep their pixels) and
    preloads the two neighbours at the same size. If Drive supplied no
