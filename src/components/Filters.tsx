@@ -7,8 +7,11 @@ type FiltersProps = {
   query: string
   type: string
   types: TypeOption[]
+  favoritesOnly: boolean
+  favoriteCount: number
   onQueryChange: (query: string) => void
   onTypeChange: (type: string) => void
+  onToggleFavorites: (favoritesOnly: boolean) => void
   onReset: () => void
 }
 
@@ -16,11 +19,15 @@ export function Filters({
   query,
   type,
   types,
+  favoritesOnly,
+  favoriteCount,
   onQueryChange,
   onTypeChange,
+  onToggleFavorites,
   onReset,
 }: FiltersProps) {
-  const isFiltering = query.trim() !== '' || type !== 'all'
+  const isFiltering =
+    query.trim() !== '' || type !== 'all' || favoritesOnly
 
   return (
     <div className="filters">
@@ -83,6 +90,24 @@ export function Filters({
           ))}
         </select>
       </label>
+
+      <button
+        type="button"
+        className={`favorites-filter${favoritesOnly ? ' is-active' : ''}`}
+        aria-pressed={favoritesOnly}
+        onClick={() => onToggleFavorites(!favoritesOnly)}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path
+            d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"
+            fill={favoritesOnly ? 'currentColor' : 'none'}
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinejoin="round"
+          />
+        </svg>
+        Favorites{favoriteCount > 0 ? ` (${favoriteCount})` : ''}
+      </button>
 
       {isFiltering ? (
         <button type="button" className="filter-reset" onClick={onReset}>

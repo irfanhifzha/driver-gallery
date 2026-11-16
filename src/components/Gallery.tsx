@@ -11,7 +11,13 @@ import {
 } from './States'
 import { Toolbar } from './Toolbar'
 import { useDriveImages } from '../hooks/useDriveImages'
-import { fileType, withoutRawDuplicates } from '../lib/drive'
+import { fileType, withoutRawDuplicates, type DriveImage } from '../lib/drive'
+import {
+  readFavorites,
+  toggleFavorite,
+  writeFavorites,
+  type FavoriteMap,
+} from '../lib/favorites'
 
 /** Photos per page. The full listing is cached, so paging is instant. */
 const PER_PAGE = 24
@@ -26,6 +32,8 @@ export function Gallery({ folderId }: GalleryProps) {
   const [hideRaw, setHideRaw] = useState(true)
   const [query, setQuery] = useState('')
   const [type, setType] = useState('all')
+  const [favoritesOnly, setFavoritesOnly] = useState(false)
+  const [favorites, setFavorites] = useState<FavoriteMap>(readFavorites)
   const [openIndex, setOpenIndex] = useState<number | null>(null)
 
   const types = useMemo(() => {
@@ -43,8 +51,13 @@ export function Gallery({ folderId }: GalleryProps) {
   const filtered = images.filter((image) => {
     if (needle && !image.name.toLowerCase().includes(needle)) return false
     if (type !== 'all' && fileType(image) !== type) return false
+    if (favoritesOnly && !favorites[image.id]) return false
     return true
   })
+  const favoriteCount = images.reduce(
+    (count, image) => (favorites[image.id] ? count + 1 : count),
+    0,
+  )
   const deduped = withoutRawDuplicates(filtered)
   const duplicateCount = filtered.length - deduped.length
   const shown = hideRaw ? deduped : filtered
@@ -88,9 +101,21 @@ export function Gallery({ folderId }: GalleryProps) {
     resetPaging()
   }
 
+  const handleToggleFavoritesOnly = (next: boolean) => {
+    setFavoritesOnly(next)
+    resetPaging()
+  }
+
+  const handleToggleFavorite = (image: DriveImage) => {
+    const next = toggleFavorite(favorites, image)
+    setFavorites(next)
+    writeFavorites(next)
+  }
+
   const handleResetFilters = () => {
     setQuery('')
     setType('all')
+    setFavoritesOnly(false)
     resetPaging()
   }
 
@@ -111,8 +136,11 @@ export function Gallery({ folderId }: GalleryProps) {
             query={query}
             type={type}
             types={types}
+            favoritesOnly={favoritesOnly}
+            favoriteCount={favoriteCount}
             onQueryChange={handleQueryChange}
             onTypeChange={handleTypeChange}
+            onToggleFavorites={handleToggleFavoritesOnly}
             onReset={handleResetFilters}
           />
         ) : null}
@@ -126,12 +154,29 @@ export function Gallery({ folderId }: GalleryProps) {
         {!loading && !error && images.length === 0 ? <EmptyState /> : null}
 
         {!loading && !error && images.length > 0 && !hasImages ? (
-          <NoMatchesState onClear={handleResetFilters} />
+          <NoMatchesState
+            onClear={handleResetFilters}
+            title={
+              favoritesOnly && favoriteCount === 0
+                ? 'No favorites in this folder'
+                : undefined
+            }
+            body={
+              favoritesOnly && favoriteCount === 0
+                ? 'Tap the heart on a photo to add it to your shortlist.'
+                : undefined
+            }
+          />
         ) : null}
 
         {hasImages ? (
           <>
-            <ImageGrid images={pageImages} onOpen={setOpenIndex} />
+            <ImageGrid
+              images={pageImages}
+              favorites={favorites}
+              onOpen={setOpenIndex}
+              onToggleFavorite={handleToggleFavorite}
+            />
 
             {pageCount > 1 ? (
               <div className="pager-bar">

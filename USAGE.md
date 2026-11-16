@@ -13,8 +13,8 @@ what it stores, what it renders, and what it never does. For setup see
   per-file requests, no downloads through the API, no writes.
 - **Images** come from Google's thumbnail CDN using signed URLs, which are not
   API calls and cost no quota.
-- **State** lives in `localStorage` (chosen folder) and `sessionStorage` (listing
-  cache) plus in-memory React state. No app cookies, no service worker, no
+- **State** lives in `localStorage` (chosen folder and favorites) and
+  `sessionStorage` (listing cache) plus in-memory React state. No app cookies, no service worker, no
   analytics, no IndexedDB.
 
 ## A normal visit, step by step
@@ -58,9 +58,13 @@ what it stores, what it renders, and what it never does. For setup see
     when the viewer closes.
 11. **Info.** The metadata panel is built from the listing already in memory —
     no request.
-12. **Open in Drive.** A normal link to `drive.google.com/drive/folders/<id>`;
+12. **Favorite.** The heart on a card toggles the file id in
+    `localStorage["drive-gallery:favorites"]`, written as
+    `{ version: 1, items: { <id>: { name, addedAt } } }`. The **Favorites**
+    filter then shows only shortlisted files in the current folder. No request.
+13. **Open in Drive.** A normal link to `drive.google.com/drive/folders/<id>`;
     the app makes no request, Google's own page handles it.
-13. **Refresh.** Clears the folder's session cache, empties the grid, and starts
+14. **Refresh.** Clears the folder's session cache, empties the grid, and starts
     a fresh listing call (one API call per 1000 files again).
 
 ## Network calls
@@ -93,6 +97,7 @@ what it stores, what it renders, and what it never does. For setup see
 | Key | Store | Lifetime | What is in it |
 | --- | --- | --- | --- |
 | `drive-gallery:folder` | `localStorage` | Until cleared | Folder ID last loaded (wins over everything on reload) |
+| `drive-gallery:favorites` | `localStorage` | Until removed | `{ version, items: { <fileId>: { name, addedAt } } }` — the shortlist |
 | `drive-gallery:listing:<folderId>` | `sessionStorage` | 5 minutes, per tab | `{ storedAt, images: [...] }` — the complete listing incl. metadata |
 
 - `sessionStorage` is typically ~5 MB per origin. A very large folder's JSON may
@@ -101,8 +106,10 @@ what it stores, what it renders, and what it never does. For setup see
   `readCache` reject the entry).
 - Clearing `drive-gallery:folder` — or pressing **Clear folder** — returns the
   app to the "Nothing here yet" state.
-- The app sets no cookies, uses no `localStorage` beyond the folder key, and
-  registers no service worker, so there is no offline mode.
+- Deleting a favorited file in Drive leaves its entry behind (id + name); it
+  simply never matches the current listing.
+- The app sets no cookies, uses `localStorage` only for the folder key and the
+  favorites JSON, and registers no service worker, so there is no offline mode.
 
 ## Client-side work (no server involved)
 
@@ -144,7 +151,9 @@ what it stores, what it renders, and what it never does. For setup see
 
 - `src/lib/drive.ts` — the API call, field list, URL builders, RAW helpers.
 - `src/hooks/useDriveImages.ts` — cache, auto-pagination, shuffle, refresh.
-- `src/components/Gallery.tsx` — filters, RAW toggle, pagination, page state.
+- `src/components/Gallery.tsx` — filters, RAW toggle, favorites state,
+  pagination, page state.
 - `src/components/Lightbox.tsx` — viewer, zoom, adjustments, info panel.
 - `src/lib/adjustments.ts` — filter string, Temperature/tint overlays.
+- `src/lib/favorites.ts` — favorites JSON read/write and toggle by file id.
 - `src/lib/metadata.ts` — EXIF/size formatting for the info panel.

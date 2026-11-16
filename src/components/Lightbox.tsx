@@ -386,11 +386,6 @@ export function Lightbox({
           {index + 1} / {images.length}
           {view.scale > MIN_ZOOM ? ` · ${view.scale.toFixed(1)}×` : ''}
         </span>
-        {failed ? null : (
-          <span className="lightbox-hint">
-            Scroll to zoom · drag to pan · double-click to reset
-          </span>
-        )}
         <a
           className="lightbox-open"
           href={`https://drive.google.com/file/d/${image.id}/view`}
@@ -408,7 +403,16 @@ export function Lightbox({
         disabled={!hasPrev}
         aria-label="Previous image"
       >
-        ‹
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path
+            d="M15 5 8 12l7 7"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       </button>
 
       <figure className="lightbox-figure">
@@ -494,7 +498,16 @@ export function Lightbox({
         disabled={!hasNext}
         aria-label="Next image"
       >
-        ›
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path
+            d="M9 5l7 7-7 7"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       </button>
 
       {adjustOpen && !failed ? (

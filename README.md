@@ -132,12 +132,13 @@ src/
 │                              #   + RAW/JPEG duplicate helpers
 ├─ lib/adjustments.ts         # adjustment defaults, CSS filter string, helpers
 ├─ lib/metadata.ts            # file size, EXIF time/exposure, metadata rows
+├─ lib/favorites.ts           # id-keyed shortlist in localStorage + JSON (de)serialise
 ├─ hooks/useDriveImages.ts    # fetch lifecycle, auto-pagination, full-listing cache
 ├─ components/
 │  ├─ FolderBar.tsx           # folder link/ID input + validation
 │  ├─ Gallery.tsx             # per-folder container: toolbar, filters, grid, pager
 │  ├─ Toolbar.tsx             # title, photo count, RAW toggle, refresh
-│  ├─ Filters.tsx             # file-name search + file-type select + reset
+│  ├─ Filters.tsx             # search + type select + Favorites toggle + reset
 │  ├─ ImageGrid.tsx           # <ul> grid of cards
 │  ├─ ImageCard.tsx           # lazy <img>, shimmer skeleton, retry + onError fallback
 │  ├─ Lightbox.tsx            # full-size view, zoom/pan, adjust + info, ←/→/Esc
@@ -185,7 +186,8 @@ src/
    displays, so no extra request is needed.
 6. `Gallery` filters before paging: case-insensitive file-name search → file-type
    select (options and counts derived from the listing, e.g. `JPEG`, `NEF`) →
-   `withoutRawDuplicates` (when its toggle is on) → `PER_PAGE = 24` slice.
+   **Favorites** (when its toggle is on) → `withoutRawDuplicates` (when its
+   toggle is on) → `PER_PAGE = 24` slice.
    Filtering is purely client-side, resets to page 1, and adds no API requests.
 7. Paging is **client-side**: the filtered array is sliced into 24-photo chunks
    and rendered by `Pagination`. Page boundaries are stable, and the lightbox
@@ -218,9 +220,10 @@ src/
 - Lightbox: fixed overlay, `role="dialog"`, `aria-modal`, focus moved to the close
   button and restored on close, body scroll locked, Tab trapped, Esc closes,
   arrows navigate, neighbours preloaded, edge arrows disabled. The photo has
-  square corners and fills the viewport height; the filename, position, zoom
-  factor, control hint, and an **Open in Google Drive** link sit in a top-left
-  overlay instead of under the image.
+  square corners and fills the viewport height; the filename, position/zoom
+  factor, and an **Open in Google Drive** link sit in a small top-left overlay
+  instead of under the image. Prev/next are SVG chevrons centred in
+  round buttons; on phones they move to the bottom corners for thumb reach.
 - Live adjustments: **Adjust** opens a panel with brightness (50–150 %),
   contrast (50–150 %), saturation (0–200 %), temperature (−100 cooler … +100
   warmer), tint hue (0–360°) and tint strength (0–100 %) sliders. Changes render
@@ -245,6 +248,11 @@ src/
   folder with counts. Both combine with the RAW toggle and pagination, reset to
   page 1 on change, and show a "No photos match" state with **Clear filters**
   when nothing matches.
+- Favorites: the heart on a card adds/removes that Drive file id from a
+  shortlist stored in `localStorage["drive-gallery:favorites"]`; the **Favorites
+  (n)** pill filters the grid to it and shows an empty state when the folder has
+  none. Entries are id-keyed JSON with `{ name, addedAt }` metadata, so they
+  survive reloads, folder switches, and renames (a renamed file keeps its id).
 - RAW filter: a toolbar checkbox (default on) hides RAW files (NEF, NRW, CR2,
   CR3, ARW, DNG, RAF, RW2, ORF, SRW, PEF, RWL, X3F, MOS, ERF, KDC, MRW, plus
   `image/x-*` MIME types) **only when a JPEG with the same base file name
@@ -491,7 +499,6 @@ the current model (public folder, API key, static site, no backend).
 - Persist adjustments per photo in `localStorage`, or export a processed image.
   Export needs canvas + CORS, and the thumbnail hosts are unlikely to allow
   `crossOrigin="anonymous"`, so it may require a same-origin proxy.
-- Favorites / shortlist in `localStorage`, with a "Favorites" filter.
 - A `?` keyboard-shortcut overlay covering arrows, Esc, and zoom keys.
 - Optional infinite scroll alongside numbered pages (page number in the URL).
 - Tests: unit tests for filtering, RAW dedupe, and adjustment helpers; a small

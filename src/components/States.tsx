@@ -25,11 +25,21 @@ export function EmptyState() {
   )
 }
 
-export function NoMatchesState({ onClear }: { onClear: () => void }) {
+type NoMatchesStateProps = {
+  onClear: () => void
+  title?: string
+  body?: string
+}
+
+export function NoMatchesState({
+  onClear,
+  title,
+  body,
+}: NoMatchesStateProps) {
   return (
     <div className="state">
-      <h2>No photos match</h2>
-      <p>Try a different file name or file type.</p>
+      <h2>{title ?? 'No photos match'}</h2>
+      <p>{body ?? 'Try a different file name or file type.'}</p>
       <button type="button" className="btn" onClick={onClear}>
         Clear filters
       </button>
