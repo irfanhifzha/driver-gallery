@@ -1270,8 +1270,9 @@
   cursor: grab;
 }
 
-/* While a crop is active the frame, not the viewer, takes the drag. */
-.lightbox-image.is-cropped {
+/* While a crop is being edited the frame, not the viewer, takes the drag;
+in   view mode the crop is just a preview and keeps the zoom cursor. */
+.lightbox-image.is-crop-editing {
   cursor: default;
 }
 
@@ -1305,8 +1306,12 @@
   aspect-ratio: var(--crop-ratio);
   overflow: hidden;
   background: #000;
-  cursor: grab;
+  cursor: inherit;
   touch-action: none;
+}
+
+.lightbox-image.is-crop-editing .lightbox-crop {
+  cursor: grab;
 }
 
 .lightbox-crop.is-cropping {

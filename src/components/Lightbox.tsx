@@ -144,6 +144,10 @@ export function Lightbox({
   const edited = image ? Boolean(edits[image.id]) : false
   const hasPrev = index > 0
   const hasNext = index < images.length - 1
+  // A crop only owns the gestures while it is being edited. In view mode the
+  // saved crop is a preview, so zoom, pan, pinch and swipe stay available.
+  const editingOpen = mode === 'editor' && adjustOpen && !failed
+  const cropEditing = editingOpen && tool === 'crop' && Boolean(crop)
 
   const resetZoom = useCallback(() => {
     dragRef.current = null
@@ -365,7 +369,7 @@ export function Lightbox({
   useEffect(() => {
     const media = mediaRef.current
     // Cropping pins the photo at 1×, so the wheel leaves the viewer alone.
-    if (!media || failed || crop) return
+    if (!media || failed || cropEditing) return
 
     const onWheel = (event: WheelEvent) => {
       event.preventDefault()
@@ -376,7 +380,7 @@ export function Lightbox({
 
     media.addEventListener('wheel', onWheel, { passive: false })
     return () => media.removeEventListener('wheel', onWheel)
-  }, [failed, zoomTo, crop])
+  }, [failed, zoomTo, cropEditing])
 
   // Move focus into whichever panel just opened.
   useEffect(() => {
@@ -433,13 +437,13 @@ export function Lightbox({
         return
       }
       if (event.key === '+' || event.key === '=') {
-        if (crop) return
+        if (cropEditing) return
         event.preventDefault()
         zoomTo(window.innerWidth / 2, window.innerHeight / 2, (s) => s * 1.25)
         return
       }
       if (event.key === '-' || event.key === '_') {
-        if (crop) return
+        if (cropEditing) return
         event.preventDefault()
         zoomTo(window.innerWidth / 2, window.innerHeight / 2, (s) => s / 1.25)
         return
@@ -474,7 +478,7 @@ export function Lightbox({
     closeAdjust,
     closeInfo,
     closeShortcuts,
-    crop,
+    cropEditing,
     goNext,
     goPrev,
     infoOpen,
@@ -501,9 +505,9 @@ export function Lightbox({
     // gesture here (rather than only on the frame) means a drag near the frame
     // edge, or on the letterbox around it, can never fall through to the
     // viewer and pan the image instead.
-    if (crop) {
+    if (cropEditing) {
       const frame = cropRef.current
-      if (mode !== 'editor' || !frame) return
+      if (!frame || !crop) return
 
       event.preventDefault()
       event.currentTarget.setPointerCapture(event.pointerId)
@@ -590,7 +594,7 @@ export function Lightbox({
     }
 
     const point = pointersRef.current.get(event.pointerId)
-    if (!point || crop) return
+    if (!point || cropEditing) return
 
     point.x = event.clientX
     point.y = event.clientY
@@ -766,7 +770,6 @@ export function Lightbox({
   if (!image) return null
 
   const whiteBalanceStyle = whiteBalanceOverlay(adjustments)
-  const editingOpen = mode === 'editor' && adjustOpen && !failed
 
   return (
     <div
@@ -954,7 +957,7 @@ export function Lightbox({
           onPointerUp={(event) => finishPointer(event)}
           onPointerCancel={(event) => finishPointer(event, true)}
           onDoubleClick={(event) => {
-            if (crop) return
+            if (cropEditing) return
             zoomTo(event.clientX, event.clientY, (scale) =>
               scale > MIN_ZOOM ? MIN_ZOOM : DOUBLE_CLICK_ZOOM,
             )
@@ -978,7 +981,7 @@ export function Lightbox({
                 view.scale > MIN_ZOOM ? ' is-zoomed' : ''
               }${dragging ? ' is-dragging' : ''}${
                 settling ? ' is-settling' : ''
-              }${crop ? ' is-cropped' : ''}`}
+              }${cropEditing ? ' is-crop-editing' : ''}`}
               style={{
                 transform: `translate(${view.x + swipeX}px, ${view.y}px) scale(${view.scale})`,
                 filter: hasAdjustments(adjustments)
