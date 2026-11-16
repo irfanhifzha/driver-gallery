@@ -48,6 +48,16 @@ export function parseRatio(input: string): number | null {
   return ratio
 }
 
+/** Field-wise comparison, so equal crops from different objects match. */
+export const sameCrop = (a: Crop | null, b: Crop | null): boolean =>
+  a === b ||
+  (a !== null &&
+    b !== null &&
+    a.ratio === b.ratio &&
+    a.zoom === b.zoom &&
+    a.x === b.x &&
+    a.y === b.y)
+
 /** Compact human label for the panel, e.g. `16:9` or `2.39:1`. */
 export function formatRatio(ratio: number): string {
   const preset = RATIO_PRESETS.find((item) => Math.abs(item.ratio - ratio) < 0.005)

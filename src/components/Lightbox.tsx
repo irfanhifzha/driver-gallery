@@ -12,7 +12,7 @@ import {
   whiteBalanceOverlay,
   type Adjustments,
 } from '../lib/adjustments'
-import { clampCrop, type Crop } from '../lib/crop'
+import { clampCrop, sameCrop, type Crop } from '../lib/crop'
 import type { EditMap, PhotoEdit } from '../lib/edits'
 import { AdjustPanel } from './AdjustPanel'
 import { EditorDock, type EditorTool } from './EditorDock'
@@ -148,6 +148,12 @@ export function Lightbox({
   // saved crop is a preview, so zoom, pan, pinch and swipe stay available.
   const editingOpen = mode === 'editor' && adjustOpen && !failed
   const cropEditing = editingOpen && tool === 'crop' && Boolean(crop)
+  // An unsaved crop is a draft owned by the Crop tool. Outside that tool the
+  // photo keeps its saved crop (or none), so viewer zoom and pan are not
+  // trapped inside a frame that was never saved.
+  const savedCrop = savedEdit?.crop ?? null
+  const displayCrop =
+    crop && (cropEditing || sameCrop(crop, savedCrop)) ? crop : null
 
   const resetZoom = useCallback(() => {
     dragRef.current = null
@@ -191,6 +197,15 @@ export function Lightbox({
       if (next) resetZoom()
       setCrop(next)
       setDirty(true)
+    },
+    [resetZoom],
+  )
+
+  /** Cropping starts from a 1× view; the frame is measured untransformed. */
+  const handleToolChange = useCallback(
+    (next: EditorTool) => {
+      if (next === 'crop') resetZoom()
+      setTool(next)
     },
     [resetZoom],
   )
@@ -989,11 +1004,11 @@ export function Lightbox({
                   : undefined,
               }}
             >
-              {crop ? (
+              {displayCrop ? (
                 <div
                   ref={cropRef}
                   className={`lightbox-crop${cropping ? ' is-cropping' : ''}`}
-                  style={{ '--crop-ratio': crop.ratio } as CSSProperties}
+                  style={{ '--crop-ratio': displayCrop.ratio } as CSSProperties}
                 >
                   <img
                     src={fullSrc(image.id)}
@@ -1002,9 +1017,9 @@ export function Lightbox({
                     draggable={false}
                     style={
                       {
-                        '--crop-x': crop.x,
-                        '--crop-y': crop.y,
-                        '--crop-zoom': crop.zoom,
+                        '--crop-x': displayCrop.x,
+                        '--crop-y': displayCrop.y,
+                        '--crop-zoom': displayCrop.zoom,
                       } as CSSProperties
                     }
                     onDragStart={(event) => event.preventDefault()}
@@ -1065,7 +1080,7 @@ export function Lightbox({
       {editingOpen ? (
         <EditorDock
           tool={tool}
-          onToolChange={setTool}
+          onToolChange={handleToolChange}
           values={adjustments}
           crop={crop}
           dirty={dirty}
