@@ -135,6 +135,7 @@ export function Lightbox({
 
   const image = images[index]
   const failed = image ? failedId === image.id : false
+  const edited = image ? Boolean(edits[image.id]) : false
   const hasPrev = index > 0
   const hasNext = index < images.length - 1
 
@@ -167,10 +168,15 @@ export function Lightbox({
     setDirty(true)
   }, [])
 
-  const updateCrop = useCallback((next: Crop | null) => {
-    setCrop(next)
-    setDirty(true)
-  }, [])
+  const updateCrop = useCallback(
+    (next: Crop | null) => {
+      // Viewer zoom on top of a crop is confusing; cropping starts at 1×.
+      if (next) resetZoom()
+      setCrop(next)
+      setDirty(true)
+    },
+    [resetZoom],
+  )
 
   const saveEdit = useCallback(() => {
     if (!image) return
@@ -329,7 +335,8 @@ export function Lightbox({
   // Wheel zoom, using a native listener so preventDefault is allowed.
   useEffect(() => {
     const media = mediaRef.current
-    if (!media || failed) return
+    // Cropping pins the photo at 1×, so the wheel leaves the viewer alone.
+    if (!media || failed || crop) return
 
     const onWheel = (event: WheelEvent) => {
       event.preventDefault()
@@ -340,7 +347,7 @@ export function Lightbox({
 
     media.addEventListener('wheel', onWheel, { passive: false })
     return () => media.removeEventListener('wheel', onWheel)
-  }, [failed, zoomTo])
+  }, [failed, zoomTo, crop])
 
   // Move focus into whichever panel just opened.
   useEffect(() => {
@@ -397,11 +404,13 @@ export function Lightbox({
         return
       }
       if (event.key === '+' || event.key === '=') {
+        if (crop) return
         event.preventDefault()
         zoomTo(window.innerWidth / 2, window.innerHeight / 2, (s) => s * 1.25)
         return
       }
       if (event.key === '-' || event.key === '_') {
+        if (crop) return
         event.preventDefault()
         zoomTo(window.innerWidth / 2, window.innerHeight / 2, (s) => s / 1.25)
         return
@@ -436,6 +445,7 @@ export function Lightbox({
     closeAdjust,
     closeInfo,
     closeShortcuts,
+    crop,
     goNext,
     goPrev,
     infoOpen,
@@ -457,6 +467,8 @@ export function Lightbox({
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return
+    // A crop frame owns the drag; no viewer pan, swipe or pinch while cropping.
+    if (crop) return
 
     event.currentTarget.setPointerCapture(event.pointerId)
     pointersRef.current.set(event.pointerId, {
@@ -509,7 +521,7 @@ export function Lightbox({
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const point = pointersRef.current.get(event.pointerId)
-    if (!point) return
+    if (!point || crop) return
 
     point.x = event.clientX
     point.y = event.clientY
@@ -839,6 +851,26 @@ export function Lightbox({
           {index + 1} / {images.length}
           {view.scale > MIN_ZOOM ? ` · ${view.scale.toFixed(1)}×` : ''}
         </span>
+        {edited ? (
+          <span className="lightbox-edited" title="Has saved adjustments">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path
+                d="M4 20h4L19 9l-4-4L4 16v4Z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.9"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M13.5 6.5 17.5 10.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.9"
+              />
+            </svg>
+            Edited
+          </span>
+        ) : null}
         <div className="lightbox-actions">
           <a
             className="lightbox-open"
@@ -898,6 +930,7 @@ export function Lightbox({
           onPointerUp={(event) => finishPointer(event)}
           onPointerCancel={(event) => finishPointer(event, true)}
           onDoubleClick={(event) => {
+            if (crop) return
             zoomTo(event.clientX, event.clientY, (scale) =>
               scale > MIN_ZOOM ? MIN_ZOOM : DOUBLE_CLICK_ZOOM,
             )
@@ -921,7 +954,7 @@ export function Lightbox({
                 view.scale > MIN_ZOOM ? ' is-zoomed' : ''
               }${dragging ? ' is-dragging' : ''}${
                 settling ? ' is-settling' : ''
-              }`}
+              }${crop ? ' is-cropped' : ''}`}
               style={{
                 transform: `translate(${view.x + swipeX}px, ${view.y}px) scale(${view.scale})`,
                 filter: hasAdjustments(adjustments)

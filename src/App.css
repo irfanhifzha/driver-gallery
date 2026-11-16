@@ -709,6 +709,29 @@
   min-width: 0;
 }
 
+/* Marks photos whose crop/colour has been saved in this browser. */
+.edited-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  color: #fff;
+  background: rgba(15, 118, 110, 0.88);
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(14, 12, 10, 0.3);
+  pointer-events: none;
+}
+
+.edited-badge svg {
+  width: 13px;
+  height: 13px;
+  display: block;
+}
+
 .favorite-toggle {
   position: absolute;
   top: 8px;
@@ -1109,6 +1132,11 @@
   cursor: grab;
 }
 
+/* While a crop is active the frame, not the viewer, takes the drag. */
+.lightbox-image.is-cropped {
+  cursor: default;
+}
+
 .lightbox-image.is-dragging {
   cursor: grabbing;
 }
@@ -1206,6 +1234,25 @@
   color: #a9a49b;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.lightbox-edited {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 2px 8px 2px 6px;
+  font-size: 11px;
+  color: #fff;
+  background: rgba(15, 118, 110, 0.85);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.lightbox-edited svg {
+  width: 11px;
+  height: 11px;
+  display: block;
 }
 
 .lightbox-actions {
@@ -1938,13 +1985,15 @@
     margin-top: 5px;
   }
 
+  /* A side panel anchored below the icon row, not a bottom sheet: the sheet
+     used to cover the photo and the nav arrows. */
   .lightbox-panel {
-    top: auto;
+    top: 56px;
     right: 12px;
-    bottom: 12px;
-    left: 12px;
-    width: auto;
-    max-height: 58svh;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    left: auto;
+    width: min(330px, 90vw);
+    max-height: none;
   }
 
   .lightbox-adjust {

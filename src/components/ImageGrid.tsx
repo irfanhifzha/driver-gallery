@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { aspectRatio, type DriveImage } from '../lib/drive'
+import type { EditMap } from '../lib/edits'
 import type { FavoriteMap } from '../lib/favorites'
 import { ImageCard } from './ImageCard'
 
@@ -11,6 +12,7 @@ type GridEntry = {
 type ImageGridProps = {
   images: DriveImage[]
   favorites: FavoriteMap
+  edits: EditMap
   onOpen: (index: number) => void
   onToggleFavorite: (image: DriveImage) => void
 }
@@ -45,6 +47,7 @@ function useColumnCount() {
 export function ImageGrid({
   images,
   favorites,
+  edits,
   onOpen,
   onToggleFavorite,
 }: ImageGridProps) {
@@ -84,6 +87,7 @@ export function ImageGrid({
               image={image}
               index={index}
               isFavorite={Boolean(favorites[image.id])}
+              isEdited={Boolean(edits[image.id])}
               onOpen={onOpen}
               onToggleFavorite={onToggleFavorite}
             />

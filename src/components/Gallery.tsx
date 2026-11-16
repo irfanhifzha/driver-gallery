@@ -300,6 +300,7 @@ export function Gallery({ folderId }: GalleryProps) {
             <ImageGrid
               images={pageImages}
               favorites={favorites}
+              edits={edits}
               onOpen={setOpenIndex}
               onToggleFavorite={handleToggleFavorite}
             />
