@@ -1,10 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { fullSrc, type DriveImage } from '../lib/drive'
+import {
+  DEFAULT_ADJUSTMENTS,
+  filterCss,
+  hasAdjustments,
+  type Adjustments,
+} from '../lib/adjustments'
+import { AdjustPanel } from './AdjustPanel'
 
 const MIN_ZOOM = 1
 const MAX_ZOOM = 5
 const DOUBLE_CLICK_ZOOM = 2.5
+const PANEL_ID = 'lightbox-adjustments'
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value))
@@ -37,9 +45,15 @@ export function Lightbox({
     originY: number
   } | null>(null)
 
+  const adjustButtonRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLElement>(null)
+
   const [failedId, setFailedId] = useState<string | null>(null)
   const [view, setView] = useState<View>(INITIAL_VIEW)
   const [dragging, setDragging] = useState(false)
+  const [adjustments, setAdjustments] =
+    useState<Adjustments>(DEFAULT_ADJUSTMENTS)
+  const [adjustOpen, setAdjustOpen] = useState(false)
 
   const image = images[index]
   const failed = image ? failedId === image.id : false
@@ -52,19 +66,34 @@ export function Lightbox({
     setView(INITIAL_VIEW)
   }, [])
 
+  const resetAdjustments = useCallback(() => {
+    setAdjustments(DEFAULT_ADJUSTMENTS)
+  }, [])
+
+  const updateAdjustments = useCallback((patch: Partial<Adjustments>) => {
+    setAdjustments((prev) => ({ ...prev, ...patch }))
+  }, [])
+
+  const closeAdjust = useCallback(() => {
+    setAdjustOpen(false)
+    adjustButtonRef.current?.focus()
+  }, [])
+
   const goPrev = useCallback(() => {
     if (index > 0) {
       resetZoom()
+      resetAdjustments()
       onIndexChange(index - 1)
     }
-  }, [index, onIndexChange, resetZoom])
+  }, [index, onIndexChange, resetAdjustments, resetZoom])
 
   const goNext = useCallback(() => {
     if (index < images.length - 1) {
       resetZoom()
+      resetAdjustments()
       onIndexChange(index + 1)
     }
-  }, [index, images.length, onIndexChange, resetZoom])
+  }, [index, images.length, onIndexChange, resetAdjustments, resetZoom])
 
   /**
    * Zoom around a screen point. The image is centred in its frame and
@@ -143,11 +172,23 @@ export function Lightbox({
     return () => media.removeEventListener('wheel', onWheel)
   }, [failed, zoomTo])
 
+  // Move focus into the panel when it opens.
+  useEffect(() => {
+    if (!adjustOpen) return
+    panelRef.current
+      ?.querySelector<HTMLInputElement>('input[type="range"]')
+      ?.focus()
+  }, [adjustOpen])
+
   // Keyboard navigation, zoom keys, and a simple focus trap.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault()
+        if (adjustOpen) {
+          closeAdjust()
+          return
+        }
         onClose()
         return
       }
@@ -179,7 +220,7 @@ export function Lightbox({
       if (event.key !== 'Tab' || !dialogRef.current) return
 
       const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
-        'button:not([disabled])',
+        'button:not([disabled]), input:not([disabled])',
       )
       if (focusable.length === 0) return
 
@@ -196,7 +237,7 @@ export function Lightbox({
 
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [goPrev, goNext, onClose, resetZoom, zoomTo])
+  }, [adjustOpen, closeAdjust, goPrev, goNext, onClose, resetZoom, zoomTo])
 
   // Preload neighbours so ←/→ feels instant.
   useEffect(() => {
@@ -270,6 +311,19 @@ export function Lightbox({
         ✕
       </button>
 
+      {failed ? null : (
+        <button
+          ref={adjustButtonRef}
+          type="button"
+          className="lightbox-adjust"
+          onClick={() => (adjustOpen ? closeAdjust() : setAdjustOpen(true))}
+          aria-expanded={adjustOpen}
+          aria-controls={PANEL_ID}
+        >
+          Adjust
+        </button>
+      )}
+
       <button
         type="button"
         className="lightbox-nav lightbox-prev"
@@ -295,36 +349,56 @@ export function Lightbox({
               </a>
             </div>
           ) : (
-            <img
-              src={fullSrc(image.id)}
-              alt={image.name}
-              referrerPolicy="no-referrer"
-              draggable={false}
-              className={`${view.scale > MIN_ZOOM ? 'is-zoomed' : ''}${
-                dragging ? ' is-dragging' : ''
-              }`}
+            <div
+              className={`lightbox-image${
+                view.scale > MIN_ZOOM ? ' is-zoomed' : ''
+              }${dragging ? ' is-dragging' : ''}`}
               style={{
                 transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
+                filter: hasAdjustments(adjustments)
+                  ? filterCss(adjustments)
+                  : undefined,
               }}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={endDrag}
-              onPointerCancel={endDrag}
-              onDoubleClick={(event) => {
-                zoomTo(event.clientX, event.clientY, (scale) =>
-                  scale > MIN_ZOOM ? MIN_ZOOM : DOUBLE_CLICK_ZOOM,
-                )
-              }}
-              onDragStart={(event) => event.preventDefault()}
-              onError={() => {
-                console.error('[drive-gallery] lightbox image failed to load', {
-                  name: image.name,
-                  mimeType: image.mimeType,
-                  id: image.id,
-                })
-                setFailedId(image.id)
-              }}
-            />
+            >
+              <img
+                src={fullSrc(image.id)}
+                alt={image.name}
+                referrerPolicy="no-referrer"
+                draggable={false}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={endDrag}
+                onPointerCancel={endDrag}
+                onDoubleClick={(event) => {
+                  zoomTo(event.clientX, event.clientY, (scale) =>
+                    scale > MIN_ZOOM ? MIN_ZOOM : DOUBLE_CLICK_ZOOM,
+                  )
+                }}
+                onDragStart={(event) => event.preventDefault()}
+                onError={() => {
+                  console.error(
+                    '[drive-gallery] lightbox image failed to load',
+                    {
+                      name: image.name,
+                      mimeType: image.mimeType,
+                      id: image.id,
+                    },
+                  )
+                  setFailedId(image.id)
+                  setAdjustOpen(false)
+                }}
+              />
+              {adjustments.tintStrength > 0 ? (
+                <span
+                  className="lightbox-tint"
+                  aria-hidden="true"
+                  style={{
+                    background: `hsl(${adjustments.tintHue} 80% 50%)`,
+                    opacity: adjustments.tintStrength / 100,
+                  }}
+                />
+              ) : null}
+            </div>
           )}
         </div>
 
@@ -354,6 +428,17 @@ export function Lightbox({
       >
         ›
       </button>
+
+      {adjustOpen && !failed ? (
+        <AdjustPanel
+          id={PANEL_ID}
+          panelRef={panelRef}
+          values={adjustments}
+          onChange={updateAdjustments}
+          onReset={resetAdjustments}
+          onClose={closeAdjust}
+        />
+      ) : null}
     </div>
   )
 }

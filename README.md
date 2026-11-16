@@ -1,8 +1,9 @@
 # Drive Gallery
 
 A Vite + React (TypeScript) photo gallery that lists images from **one public
-Google Drive folder** via the Drive API v3 and renders them in a responsive grid
-with a keyboard-navigable lightbox.
+Google Drive folder** via the Drive API v3 and renders them in a randomized
+masonry grid with a keyboard-navigable lightbox and a live, preview-only photo
+editor.
 
 - No backend, no OAuth: the folder is shared "Anyone with the link", and the
   browser uses a **referrer-restricted API key**.
@@ -55,6 +56,7 @@ src/
 ├─ config.ts                  # apiKey (required), defaultFolderId (optional), configError
 ├─ lib/drive.ts               # the ONLY module that knows Google exists
 │                              #   + RAW/JPEG duplicate helpers
+├─ lib/adjustments.ts         # adjustment defaults, CSS filter string, helpers
 ├─ hooks/useDriveImages.ts    # fetch lifecycle, auto-pagination, full-listing cache
 ├─ components/
 │  ├─ FolderBar.tsx           # folder link/ID input, validation, "Use default"
@@ -63,7 +65,8 @@ src/
 │  ├─ Filters.tsx             # file-name search + file-type select + reset
 │  ├─ ImageGrid.tsx           # <ul> grid of cards
 │  ├─ ImageCard.tsx           # lazy <img>, shimmer skeleton, retry + onError fallback
-│  ├─ Lightbox.tsx            # full-size view, ←/→/Esc, focus trap, scroll lock
+│  ├─ Lightbox.tsx            # full-size view, zoom/pan, adjust panel, ←/→/Esc
+│  ├─ AdjustPanel.tsx         # brightness/contrast/saturation/tint sliders
 │  ├─ Pagination.tsx          # Prev/Next + numbered pages (24 per page)
 │  └─ States.tsx              # LoadingGrid / EmptyState / ErrorState
 ├─ App.tsx                    # shell: resolves/persists the folder, mounts Gallery
@@ -97,7 +100,7 @@ src/
 5. The listing is shuffled in `useDriveImages`, and `imageMediaMetadata`
    width/height (requested in `FIELDS`) sets each tile's aspect ratio, so the
    masonry order changes per visit while the layout reserves space before load.
-6. `App` filters before paging: case-insensitive file-name search → file-type
+6. `Gallery` filters before paging: case-insensitive file-name search → file-type
    select (options and counts derived from the listing, e.g. `JPEG`, `NEF`) →
    `withoutRawDuplicates` (when its toggle is on) → `PER_PAGE = 24` slice.
    Filtering is purely client-side, resets to page 1, and adds no API requests.
@@ -132,6 +135,14 @@ src/
 - Lightbox: fixed overlay, `role="dialog"`, `aria-modal`, focus moved to the close
   button and restored on close, body scroll locked, Tab trapped, Esc closes,
   arrows navigate, neighbours preloaded, edge arrows disabled.
+- Live adjustments: **Adjust** opens a panel with brightness (50–150 %),
+  contrast (50–150 %), saturation (0–200 %), tint hue (0–360°) and tint strength
+  (0–100 %) sliders. Changes render instantly: a `filter` chain on the image plus
+  a `mix-blend-mode: color` overlay for tint, both inside the zoom transform so
+  they follow pan/zoom. The panel shows the live values and generated
+  `filter: …` string, with Reset, and is preview-only — nothing is saved,
+  exported, or written to Drive. Esc closes the panel before the viewer, and
+  settings reset when changing photos.
 - Zoom: the mouse wheel zooms 1×–5× around the cursor, dragging pans while
   zoomed, double-click toggles 2.5×/1×, and `+`, `-`, `0` zoom in/out/reset from
   the keyboard. The scaled image is clipped to its frame so it never covers the
@@ -251,8 +262,9 @@ Chrome/Firefox/Edge.
    That is Drive's server-side conversion, not native browser support.
 3. If the thumbnail still cannot be decoded, the `<img>` fires `onError` and the
    card is replaced by a tile showing the **file name** — no broken-image icon.
-4. The lightbox has no explicit fallback: opening a file the browser cannot
-   decode shows the browser's broken-image rendering and the alt text.
+4. If the lightbox image fails, it is replaced by a panel with the file name,
+   "This file cannot be displayed in the browser." and an **Open in Drive**
+   link, so the browser never shows a broken-image icon.
 5. A file with no `thumbnailLink` goes straight to `fullSrc()`; if that also
    fails, the card shows the filename tile.
 
@@ -292,10 +304,7 @@ q: `'${folderId}' in parents and trashed = false and (
 
 ## Roadmap (not implemented)
 
-- **Live photo adjustments** — brightness, contrast, saturation, and tint sliders
-  in the lightbox. Preview only: nothing is saved, exported, or written back to
-  Drive. The detailed plan (controls, tint compositing, milestones, checks) lives
-  in [`TODO.md`](./TODO.md).
+- Persist adjustments per photo (localStorage) or export a processed image.
 - Sort by file name or modified date.
 - `?folder=` URL parameter so a link can open a specific folder.
 - Production deployment (host + referrer allowlist + env vars).
