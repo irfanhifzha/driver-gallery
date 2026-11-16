@@ -228,11 +228,14 @@ src/
   HEIC and expired thumbnails).
 - Lightbox: fixed overlay, `role="dialog"`, `aria-modal`, focus moved to the close
   button and restored on close, body scroll locked, Tab trapped, Esc closes,
-  arrows navigate, neighbours preloaded, edge arrows disabled. The photo has
-  square corners and fills the viewport height; the filename, position/zoom
-  factor, an **Open in Google Drive** link, and a **Favorite** toggle sit in a
-  small top-left overlay instead of under the image. Prev/next are SVG chevrons centred in
-  round buttons; on phones they move to the bottom corners for thumb reach.
+  arrows navigate, neighbours preloaded, edge arrows disabled. The filename,
+  position/zoom factor, **Open in Google Drive**, **Favorite**, and keyboard
+  shortcut controls form a meta band at the top; its measured height is
+  reserved (and re-measured when the actions wrap or the window resizes), so
+  the photo is scaled into the space below it and the two never overlap. The
+  photo has square corners. Prev/next are SVG chevrons centred on the photo
+  area in round buttons; on phones they move to the bottom corners for thumb
+  reach.
 - Live adjustments: **Adjust** opens a panel with brightness (50–150 %),
   contrast (50–150 %), saturation (0–200 %), temperature (−100 cooler … +100
   warmer), tint hue (0–360°) and tint strength (0–100 %) sliders. Changes render

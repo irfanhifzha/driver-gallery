@@ -54,8 +54,9 @@ what it stores, what it renders, and what it never does. For setup see
    Google CDN requests, not Drive API calls.
 8. **Open a photo.** The lightbox requests
    `drive.google.com/thumbnail?id=…&sz=w1600` (`fullSrc`) and preloads the two
-   neighbours at the same size. Its top-left overlay links the file to
-   `drive.google.com/file/d/<id>/view` in a new tab. Opening, navigating, and
+   neighbours at the same size. Its top meta band links the file to
+   `drive.google.com/file/d/<id>/view` in a new tab, and its height is measured
+   so the photo always starts below that band. Opening, navigating, and
    closing the viewer writes the current photo id to `?photo=` (in place, via
    `replaceState`). A shared `?photo=<fileId>` link is resolved against the
    listing: the gallery jumps to the page holding that id and opens it. If the

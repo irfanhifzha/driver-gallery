@@ -84,6 +84,7 @@ export function Lightbox({
   const swipeMovedRef = useRef(false)
   const settleTimerRef = useRef<number | undefined>(undefined)
 
+  const metaRef = useRef<HTMLDivElement>(null)
   const adjustButtonRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLElement>(null)
   const infoButtonRef = useRef<HTMLButtonElement>(null)
@@ -232,6 +233,31 @@ export function Lightbox({
   )
 
   useEffect(() => () => window.clearTimeout(settleTimerRef.current), [])
+
+  // Measure the filename/count/actions block and reserve that much room above
+  // the photo, so the caption band never sits on top of the image — including
+  // when its action pills wrap on a narrow screen.
+  useEffect(() => {
+    const meta = metaRef.current
+    const dialog = dialogRef.current
+    if (!meta || !dialog) return
+
+    const update = () => {
+      dialog.style.setProperty(
+        '--lightbox-meta-bottom',
+        `${meta.offsetTop + meta.offsetHeight}px`,
+      )
+    }
+
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(meta)
+    window.addEventListener('resize', update)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', update)
+    }
+  }, [image?.id])
 
   // Lock body scroll, move focus in, and give it back on close.
   useEffect(() => {
@@ -642,7 +668,7 @@ export function Lightbox({
         ?
       </button>
 
-      <div className="lightbox-meta">
+      <div ref={metaRef} className="lightbox-meta">
         <span className="lightbox-name">{image.name}</span>
         <span className="lightbox-count">
           {index + 1} / {images.length}

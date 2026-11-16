@@ -783,13 +783,19 @@
 /* ---------- Lightbox ---------- */
 
 .lightbox {
+  /* JS keeps --lightbox-meta-bottom in sync with the meta block's measured
+     height, so the photo starts below the filename/actions instead of under
+     them. The values here are the pre-measurement fallbacks. */
+  --lightbox-gap: 24px;
+  --lightbox-meta-bottom: 96px;
   position: fixed;
   inset: 0;
   z-index: 50;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: var(--lightbox-gap);
+  padding-top: calc(var(--lightbox-meta-bottom) + var(--lightbox-gap));
 }
 
 .lightbox-backdrop {
@@ -818,7 +824,9 @@
   justify-content: center;
   overflow: hidden;
   max-width: 100%;
-  max-height: calc(100svh - 48px);
+  max-height: calc(
+    100svh - var(--lightbox-meta-bottom) - var(--lightbox-gap) * 2
+  );
   background: rgba(255, 255, 255, 0.03);
   /* Let pointer events drive swipe and pinch instead of browser pan/zoom. */
   touch-action: none;
@@ -829,7 +837,9 @@
   isolation: isolate;
   overflow: hidden;
   max-width: 100%;
-  max-height: calc(100svh - 48px);
+  max-height: calc(
+    100svh - var(--lightbox-meta-bottom) - var(--lightbox-gap) * 2
+  );
   cursor: zoom-in;
   will-change: transform;
 }
@@ -850,7 +860,9 @@
 .lightbox-image img {
   display: block;
   max-width: 100%;
-  max-height: calc(100svh - 48px);
+  max-height: calc(
+    100svh - var(--lightbox-meta-bottom) - var(--lightbox-gap) * 2
+  );
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
@@ -1290,15 +1302,16 @@
   font-size: 14px;
 }
 
+/* Centre the arrows on the photo area, which starts below the meta block. */
 .lightbox-prev {
   left: 16px;
-  top: 50%;
+  top: calc(50% + var(--lightbox-meta-bottom) / 2);
   transform: translateY(-50%);
 }
 
 .lightbox-next {
   right: 16px;
-  top: 50%;
+  top: calc(50% + var(--lightbox-meta-bottom) / 2);
   transform: translateY(-50%);
 }
 
@@ -1382,13 +1395,8 @@
   }
 
   .lightbox {
-    padding: 12px;
-  }
-
-  .lightbox-media,
-  .lightbox-image,
-  .lightbox-image img {
-    max-height: calc(100svh - 24px);
+    --lightbox-gap: 12px;
+    --lightbox-meta-bottom: 128px;
   }
 
   .lightbox-close {
