@@ -1254,6 +1254,8 @@
   background: rgba(255, 255, 255, 0.03);
   /* Let pointer events drive swipe and pinch instead of browser pan/zoom. */
   touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .lightbox-image {
@@ -1293,6 +1295,10 @@ in   view mode the crop is just a preview and keeps the zoom cursor. */
   -webkit-user-select: none;
   -webkit-touch-callout: none;
   touch-action: none;
+  /* The photo is never a drag source: pointer events land on the wrapper, so
+     the browser cannot start a native image drag or selection instead. */
+  -webkit-user-drag: none;
+  pointer-events: none;
 }
 
 /* A crop is previewed by fitting the photo to a fixed frame. The frame's width
@@ -1329,6 +1335,7 @@ in   view mode the crop is just a preview and keeps the zoom cursor. */
   transform: scale(var(--crop-zoom));
   transform-origin: center;
   pointer-events: none;
+  -webkit-user-drag: none;
 }
 
 .lightbox-tint {

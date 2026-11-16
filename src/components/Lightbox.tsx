@@ -971,6 +971,7 @@ export function Lightbox({
           onPointerMove={handlePointerMove}
           onPointerUp={(event) => finishPointer(event)}
           onPointerCancel={(event) => finishPointer(event, true)}
+          onDragStart={(event) => event.preventDefault()}
           onDoubleClick={(event) => {
             if (cropEditing) return
             zoomTo(event.clientX, event.clientY, (scale) =>
