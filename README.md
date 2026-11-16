@@ -23,18 +23,20 @@ React 19 · TypeScript 7 · Vite 8 · oxlint. No runtime dependencies beyond Rea
 ## Setup
 
 Create `.env.local` in the project root (it is git-ignored via `*.local`). The
-API key is required; the folder ID is only the default shown on first load, since
-folders can be switched in the UI.
+API key is the only setting; the folder is picked in the UI, so there is no
+default folder baked into the build.
 
 ```
 VITE_GOOGLE_API_KEY=...
-VITE_DRIVE_FOLDER_ID=...
 ```
 
 | Variable | Meaning |
 | --- | --- |
 | `VITE_GOOGLE_API_KEY` | Google Cloud API key, restricted to the Drive API and HTTP referrers (`http://localhost:5173/*`). |
-| `VITE_DRIVE_FOLDER_ID` | Optional default folder: the `<id>` segment of `https://drive.google.com/drive/folders/<id>`. Can be changed per visit in the UI. |
+
+Until a folder is loaded, the app shows a **Pick a folder** prompt and makes no
+Drive requests. The last folder you loaded is remembered in
+`localStorage["drive-gallery:folder"]`, not in the environment.
 
 **Env loading:** Vite reads `.env.local`.
 A wrong or placeholder value here produces `400 API key not valid` straight from
@@ -49,24 +51,96 @@ npm run lint     # oxlint
 npm run preview  # serve dist/
 ```
 
+## Cost and free limits
+
+The project is designed to stay inside Google's free quota with no billing
+account. It makes exactly one kind of Drive API call and never downloads file
+content through the API.
+
+### What this app consumes
+
+| Traffic | Drive API call | Cost |
+| --- | --- | --- |
+| Loading or refreshing a folder | **one** `files.list` per 1000 files | 100 quota units |
+| Scrolling, paging, filtering, search, RAW toggle | none (client-side) | 0 |
+| Opening the lightbox / grid thumbnails | none — signed CDN URLs | 0 |
+| File info panel, zoom, adjustments | none (same listing data) | 0 |
+
+- A 70-photo folder is a single `files.list` → **100 quota units**, cached in
+  `sessionStorage` for 5 minutes, so repeat views and back-navigation are free.
+- Thumbnails come from `lh3.googleusercontent.com` / `drive.google.com/thumbnail`.
+  They are neither API calls nor metered quota units (they have their own
+  referrer rate limit — see [Gotchas](#gotchas)).
+- There is no `files.get`, no `alt=media` download, no OAuth, no backend, and no
+  paid SDK. React is the only runtime dependency.
+
+### Current Drive API quotas (verified 2026-11-16)
+
+Google replaced request counts with **quota units** for Cloud projects created
+on or after **2026-05-01**; older projects keep their previous request-based
+quotas. From Google's [Usage limits][limits] page:
+
+| Limit | Value |
+| --- | --- |
+| Per minute per project | 1,000,000 quota units |
+| Per minute per user per project | 325,000 quota units |
+| Per day per project (egress before charges) | 1 TB |
+| Per day per project (billing threshold, cannot be raised) | 400,000,000 quota units |
+
+Method costs: read 5 units, **list 100 units**, edit 50 units, download 200 units
+(`files.get` with `alt=media`). API-key requests have no user identity, so the
+project-wide limits are the ones that apply here.
+
+### How much headroom that is
+
+- Per minute: 1,000,000 ÷ 100 = **10,000 folder listings per minute**, project-wide.
+- Per day: 400,000,000 ÷ 100 = **4,000,000 folder listings** before the billing
+  threshold — and each listing covers up to 1000 photos and is cached for 5 min.
+- Egress: 1 TB/day applies to API downloads. This app downloads **0 bytes**
+  through the API, so that limit is never approached.
+
+A small gallery would need millions of daily visits to come close.
+
+### Keeping it strictly free
+
+1. **Do not attach a billing account** to the Google Cloud project that holds the
+   API key. Enabling the Drive API and creating a key does not require billing;
+   without a billing account there is nothing to charge, and quota errors are the
+   worst case.
+2. Keep the 5-minute listing cache and the single-listing design. Do not add
+   per-image `files.get` calls; each one would cost 5 units and any download 200.
+3. Keep the key referrer-restricted (free, and limits abuse of your project quota).
+4. Google's docs state standard Drive API use is free and that exceeding quotas is
+   *planned* to incur charges later in 2026 with at least 90 days' notice. Staying
+   under 400 M units/day makes that a non-issue.
+
+Not covered by any of this: static hosting and a custom domain are separate
+services with their own free tiers, and the photos live in the folder owner's
+Google Drive storage (15 GB free on a personal account). The gallery itself adds
+no storage cost.
+
+[limits]: https://developers.google.com/workspace/drive/api/guides/limits
+
 ## Architecture
 
 ```
 src/
-├─ config.ts                  # apiKey (required), defaultFolderId (optional), configError
+├─ config.ts                  # apiKey (required) + configError
 ├─ lib/drive.ts               # the ONLY module that knows Google exists
 │                              #   + RAW/JPEG duplicate helpers
 ├─ lib/adjustments.ts         # adjustment defaults, CSS filter string, helpers
+├─ lib/metadata.ts            # file size, EXIF time/exposure, metadata rows
 ├─ hooks/useDriveImages.ts    # fetch lifecycle, auto-pagination, full-listing cache
 ├─ components/
-│  ├─ FolderBar.tsx           # folder link/ID input, validation, "Use default"
+│  ├─ FolderBar.tsx           # folder link/ID input + validation
 │  ├─ Gallery.tsx             # per-folder container: toolbar, filters, grid, pager
 │  ├─ Toolbar.tsx             # title, photo count, RAW toggle, refresh
 │  ├─ Filters.tsx             # file-name search + file-type select + reset
 │  ├─ ImageGrid.tsx           # <ul> grid of cards
 │  ├─ ImageCard.tsx           # lazy <img>, shimmer skeleton, retry + onError fallback
-│  ├─ Lightbox.tsx            # full-size view, zoom/pan, adjust panel, ←/→/Esc
+│  ├─ Lightbox.tsx            # full-size view, zoom/pan, adjust + info, ←/→/Esc
 │  ├─ AdjustPanel.tsx         # brightness/contrast/saturation/tint sliders
+│  ├─ InfoPanel.tsx           # file metadata panel (EXIF, size, dimensions)
 │  ├─ Pagination.tsx          # Prev/Next + numbered pages (24 per page)
 │  └─ States.tsx              # LoadingGrid / EmptyState / ErrorState
 ├─ App.tsx                    # shell: resolves/persists the folder, mounts Gallery
@@ -76,13 +150,16 @@ src/
 
 ### Data flow
 
-1. `App` resolves the folder in this order: `localStorage["drive-gallery:folder"]
-   → VITE_DRIVE_FOLDER_ID → empty prompt`. Only the API key is mandatory; if it
-   is missing, a "Configuration needed" state is shown and nothing fetches.
-   `Gallery` is keyed by the folder ID, so switching folders remounts it and
-   resets paging, filters, the lightbox, and the hook's cache lookup.
+1. `App` restores the folder from `localStorage["drive-gallery:folder"]`.
+   With nothing stored it renders a **Pick a folder** prompt instead of the
+   gallery, so no request is made until a folder is loaded. Only the API key is
+   mandatory; if it is missing, a "Configuration needed" state is shown and
+   nothing fetches. `Gallery` is keyed by the folder ID, so switching folders
+   remounts it and resets paging, filters, the lightbox, and the hook's cache
+   lookup.
 2. `useDriveImages` looks for a fresh (<5 min) **complete** listing in
-   `sessionStorage["drive-gallery:<folderId>"]` during the first render.
+   `sessionStorage["drive-gallery:listing:<folderId>"]` during the first
+   render.
    - Cache hit → images are available immediately, no request.
    - Miss → `listImages()` runs in an effect, with an `AbortController` aborted
      on unmount, refresh, or a newer request.
@@ -96,10 +173,13 @@ src/
 4. Cards render `thumbnailLink` as a `srcSet` (`=s400`, `=s800`, `=s1600`) so the
    browser picks a size for the column width. Those are pre-signed
    `lh3.googleusercontent.com` URLs and cost **zero** API calls. The lightbox
-   uses `fullSrc(id)` (`drive.google.com/thumbnail?id=…&sz=w1600`).
+   uses `fullSrc(id)` (`drive.google.com/thumbnail?id=…&sz=w1600`). Neither
+   path ever fetches the original — see [Image resolution](#image-resolution).
 5. The listing is shuffled in `useDriveImages`, and `imageMediaMetadata`
    width/height (requested in `FIELDS`) sets each tile's aspect ratio, so the
    masonry order changes per visit while the layout reserves space before load.
+   The same `imageMediaMetadata` object carries the EXIF fields the info panel
+   displays, so no extra request is needed.
 6. `Gallery` filters before paging: case-insensitive file-name search → file-type
    select (options and counts derived from the listing, e.g. `JPEG`, `NEF`) →
    `withoutRawDuplicates` (when its toggle is on) → `PER_PAGE = 24` slice.
@@ -143,6 +223,12 @@ src/
   `filter: …` string, with Reset, and is preview-only — nothing is saved,
   exported, or written to Drive. Esc closes the panel before the viewer, and
   settings reset when changing photos.
+- File info: **Info** in the lightbox opens a panel with file name, type, size,
+  pixel dimensions, capture time, camera and lens, exposure time, aperture, ISO,
+  focal length, flash, GPS coordinates, and modified date. Fields Drive does not
+  report are omitted, and everything comes from the single folder listing. Info
+  and Adjust share the top-right corner, so opening one closes the other, and
+  Esc closes the open panel before the viewer.
 - Zoom: the mouse wheel zooms 1×–5× around the cursor, dragging pans while
   zoomed, double-click toggles 2.5×/1×, and `+`, `-`, `0` zoom in/out/reset from
   the keyboard. The scaled image is clipped to its frame so it never covers the
@@ -186,16 +272,15 @@ The folder bar above the gallery accepts either a raw Drive folder ID or a paste
 link containing `/folders/<id>` (e.g.
 `https://drive.google.com/drive/folders/1AbC...`). **Load folder** validates it,
 stores it in `localStorage["drive-gallery:folder"]`, and remounts the gallery for
-that folder. **Use default** appears when the current folder differs from
-`VITE_DRIVE_FOLDER_ID`.
+that folder. There is no env-configured default folder to fall back to.
 
 - The folder must be public (**Anyone with the link → Viewer**); being shared
   with your account only is not enough for the API-key model.
 - Invalid input shows an inline error and leaves the current folder untouched.
 - Listings are cached per folder for 5 minutes, so switching back to a folder
   you just viewed is instant. Filters, paging, and the lightbox reset on switch.
-- The stored folder wins over the env default on reload; clear the
-  `drive-gallery:folder` key (or press **Use default**) to go back.
+- The stored folder is restored on reload; clear the `drive-gallery:folder`
+  key to start again from the empty prompt.
 - This is read-only: the app never modifies the folder or its sharing.
 
 ## Smoke-testing the Drive setup
@@ -225,11 +310,55 @@ curl -s -H "Referer: http://localhost:5173/" \
   fallback behaviour.
 - Gallery `<img>` elements must keep `referrerPolicy="no-referrer"`: Drive's
   signed thumbnail CDN responds `429` to requests that send a `Referer`.
+- **Right-click → "Open image in new tab" shows a 429 page.** The new tab is a
+  navigation, so the `<img>` referrer policy is ignored and the app origin is
+  sent as `Referer`, which Google's thumbnail hosts reject. It is not the Drive
+  API quota. Reloading that tab or pasting the URL in a fresh tab works; see
+  [the debugging note](#why-open-image-in-new-tab-returns-a-429).
 - Files added to the folder without inherited sharing silently disappear from the
   listing.
 - Public folder only; a file must be viewable by anyone with the link.
 - The app currently has one lint warning (`react/set-state-in-effect` on the
   mount fetch effect). It is expected for fetch-on-mount and does not fail lint.
+
+## Image resolution
+
+The gallery never downloads originals. Both image paths use Drive's thumbnail
+endpoints, and both are capped:
+
+| Where | URL | Ceiling |
+| --- | --- | --- |
+| Lightbox (`fullSrc`) | `drive.google.com/thumbnail?id=…&sz=w1600` | 1600 px **wide** (a portrait can be taller) |
+| Grid (`thumbSrcSet`) | `lh3.googleusercontent.com/…=s400 / =s800 / =s1600` | 1600×1600 box; the browser usually picks 400 or 800 |
+
+- `sz=wN` scales the image to width `N`, preserving aspect ratio, and **never
+  upscales** — a file narrower than `N` comes back at its native size.
+- `=sN` fits the image inside an `N`×`N` box, so `=s1600` is 1600 px on the
+  long edge (a 1080×1920 portrait becomes 900×1600).
+
+Measured on a folder of 1080×1920 PNGs:
+
+```
+sz=w400    400x711    371 KB
+sz=w800    800x1422   1.22 MB
+sz=w1600   1080x1920  2.05 MB   native, no upscaling
+lh3 =s1600 900x1600   1.41 MB   square box, 1600 on the long edge
+```
+
+Consequences:
+
+- Photos at or below the cap render 1:1, so resolution appears to differ between
+  folders — a 1080 px-wide set looks identical to the original, while a 6000 px
+  photo is delivered as 1600 px in the viewer.
+- At 5× zoom the lightbox shows interpolated pixels; that is the cap, not a bug.
+- Originals would need `files.get?alt=media` with OAuth.
+
+To raise the ceiling, change the default in `src/lib/drive.ts`
+(`fullSrc(id, w = 1600)`) or the lightbox call site; the same endpoint accepts
+larger widths such as `sz=w2400`, at the cost of a bigger download. The signed
+`thumbnailLink` also accepts `=s0`, which returned the **exact original bytes**
+(2,053,200 bytes for the file above) with no extra API call — but only when
+`thumbnailLink` exists, and those URLs expire after a few hours.
 
 ## Supported image formats
 
@@ -286,6 +415,36 @@ so every gallery `<img>` sets `referrerPolicy="no-referrer"`. Keep that attribut
 when adding new images; without it, a large folder shows filename tiles instead
 of photos even though the URLs work with `curl`.
 
+### Why "Open image in new tab" returns a 429
+
+The `429` is Google's referrer check on its thumbnail hosts
+(`lh3.googleusercontent.com`, `drive.google.com/thumbnail`), **not** this app's
+API quota — Drive API calls go to `www.googleapis.com`, images never do. The
+page it returns is an HTML "rate limit exceeded" page, not an image.
+
+In-page images work because every `<img>` sets `referrerPolicy="no-referrer"`.
+Right-click → **Open image in new tab** is a top-level navigation, so the
+element's referrer policy no longer applies and the browser sends the page
+origin (`Referer: http://localhost:5173/`) with the request. Google treats that
+unknown referrer as hotlinking and answers `429` instead of the image.
+
+Measured on the same signed URL and the same Drive thumbnail URL:
+
+| Request | Result |
+| --- | --- |
+| no `Referer` (what the gallery sends) | `200`, image bytes |
+| `Referer: http://localhost:5173/` (new tab) | `429`, HTML error page |
+| `Referer: https://drive.google.com/` | `200`, image bytes |
+
+That last row is why **reloading** the 429 tab usually works: a reload refers to
+the image's own `google.com` URL rather than the app, which passes the check.
+Pasting the copied URL into a fresh tab (no referrer) also works. Signed
+`thumbnailLink` URLs additionally expire after a few hours, so a URL copied long
+ago can fail for that separate reason.
+
+This only affects taking a single image out of the app; the gallery itself is
+unaffected because it controls the referrer on every request it makes.
+
 A file that still fails after the retry usually has no Drive thumbnail at all
 (very recent upload, processing failure, or an unusual format) — Drive returns
 `404`/HTML from both endpoints for those, and the filename tile is the correct
@@ -304,7 +463,78 @@ q: `'${folderId}' in parents and trashed = false and (
 
 ## Roadmap (not implemented)
 
-- Persist adjustments per photo (localStorage) or export a processed image.
-- Sort by file name or modified date.
-- `?folder=` URL parameter so a link can open a specific folder.
-- Production deployment (host + referrer allowlist + env vars).
+Ideas only, roughly ordered by effort. Everything in the first two groups keeps
+the current model (public folder, API key, static site, no backend).
+
+### Near term (small, no new services)
+
+- `?folder=<id>&photo=<fileId>` URL parameters: shareable links that reopen the
+  same folder and lightbox photo, restored on load.
+- Sort control (file name, modified date) with the choice remembered; random
+  shuffle stays the default.
+- Persist adjustments per photo in `localStorage`, or export a processed image.
+  Export needs canvas + CORS, and the thumbnail hosts are unlikely to allow
+  `crossOrigin="anonymous"`, so it may require a same-origin proxy.
+- Favorites / shortlist in `localStorage`, with a "Favorites" filter.
+- A `?` keyboard-shortcut overlay covering arrows, Esc, and zoom keys.
+- Optional infinite scroll alongside numbered pages (page number in the URL).
+- Higher-resolution viewing and an "Original" link — see [`TODO.md`](./TODO.md).
+- Tests: unit tests for filtering, RAW dedupe, and adjustment helpers; a small
+  browser smoke test for folder switching and the lightbox.
+- Production deployment (static host + referrer allowlist + env vars).
+
+### Folder scale (data volume)
+
+- **~1,000+ files:** the listing JSON grows past what `sessionStorage` happily
+  holds (typically ~5 MB per origin) and `writeCache` silently gives up, so every
+  reload refetches. Cache a compact projection (id, name, mimeType, size,
+  modified, width/height, thumbnail link) instead of whole objects, or move the
+  cache to IndexedDB.
+- **~10,000+ files:** auto-pagination fetches every page before filtering, and
+  the filter runs over the whole array on each keystroke. Consider "load more"
+  instead of fetching everything, memoised filtering, and sending the search to
+  Drive's `q` (`name contains '…'`) with debounce.
+- **~50,000+ files:** `MAX_PAGES = 50` becomes the real ceiling. At that point
+  folder-wide listings stop being viable and search/paging has to move
+  server-side.
+- Bandwidth: cards already request 400/800/1600 with a layout-tuned `sizes`,
+  `loading="lazy"`, and `decoding="async"`. If the page size or column count
+  grows, re-check that `sizes` string, and consider `fetchpriority="high"` for
+  the first row so the top of a long page paints sooner.
+
+### Traffic scale (quota and caching)
+
+- Today each new session costs one listing (100 quota units); the per-minute
+  project quota is the limit that binds first if a gallery goes viral.
+- Put listings behind a tiny edge/serverless proxy with a KV cache and a
+  per-folder TTL, so all visitors share one upstream call and the API key can
+  move server-side.
+- Or bake a manifest at build time (CI writes the listing to JSON on deploy) and
+  serve it statically: zero Drive calls at runtime, refresh by redeploying or by
+  an on-demand rebuild hook.
+- Longer TTLs for public galleries (30–60 min) plus the existing manual Refresh
+  button.
+- A service worker for the shell and recent listings would make revisits instant
+  and the gallery usable offline; thumbnails are signed and expire, so cache
+  them with short lifetimes only.
+
+### Reach and media
+
+- Private folders require OAuth (PKCE, per-user quotas, token refresh) and give
+  up the "no login, no backend" simplicity — a deliberate non-goal until needed.
+- Multiple saved folders / collections, with one listing cache per folder.
+- Video support via `videoMediaMetadata` and Drive's streaming endpoint (200
+  quota units per download, so it needs the same caching story as listings).
+- Client-side HEIC/RAW conversion via WASM for formats `<img>` cannot decode;
+  adds a large dependency, so gate it behind a click.
+- Timeline grouping by EXIF `time`, and a map view from `location` metadata.
+- Original-file download per photo, with a clear warning about file size.
+
+### What would break the free model
+
+- Fetching originals for every photo, or a `files.get` per image (5–200 quota
+  units each, millions of calls at scale).
+- Server-side image processing or thumbnail generation.
+- OAuth verification for broad public use (privacy policy, review, consent
+  screen).
+- Any per-request paid API sitting in front of the gallery.
