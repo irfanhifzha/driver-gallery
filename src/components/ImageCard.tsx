@@ -82,6 +82,11 @@ export function ImageCard({ image, index, onOpen }: ImageCardProps) {
         ) : (
           <span className="fallback">{image.name}</span>
         )}
+        {status !== 'failed' ? (
+          <span className="card-caption" aria-hidden="true">
+            {image.name}
+          </span>
+        ) : null}
         {status === 'loading' ? (
           <span className="skeleton" aria-hidden="true" />
         ) : null}

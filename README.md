@@ -63,8 +63,8 @@ src/
 │  ├─ Pagination.tsx          # Prev/Next + numbered pages (24 per page)
 │  └─ States.tsx              # LoadingGrid / EmptyState / ErrorState
 ├─ App.tsx                    # composes the above; owns lightbox index
-├─ App.css                    # all gallery/lightbox styling
-└─ index.css                  # light-mode design tokens, base element styles
+├─ App.css                    # gallery, paging, states, lightbox + zoom styling
+└─ index.css                  # warm light-theme tokens, base element styles
 ```
 
 ### Data flow
@@ -122,6 +122,10 @@ src/
 - Lightbox: fixed overlay, `role="dialog"`, `aria-modal`, focus moved to the close
   button and restored on close, body scroll locked, Tab trapped, Esc closes,
   arrows navigate, neighbours preloaded, edge arrows disabled.
+- Zoom: the mouse wheel zooms 1×–5× around the cursor, dragging pans while
+  zoomed, double-click toggles 2.5×/1×, and `+`, `-`, `0` zoom in/out/reset from
+  the keyboard. The scaled image is clipped to its frame so it never covers the
+  caption or arrows; zoom resets when changing photos.
 - RAW filter: a toolbar checkbox (default on) hides RAW files (NEF, NRW, CR2,
   CR3, ARW, DNG, RAF, RW2, ORF, SRW, PEF, RWL, X3F, MOS, ERF, KDC, MRW, plus
   `image/x-*` MIME types) **only when a JPEG with the same base file name
@@ -134,6 +138,18 @@ exists**, so NEF+JPG pairs show once and lone RAW shots stay visible. Matching i
 - Page states: loading grid, empty folder, error + "Try again", inline page error
   when cached images are still on screen, and a "Loading all photos…" indicator
   while remaining pages are fetched in the background.
+
+## Styling
+
+- Light-only warm-paper palette (cream background, white cards, teal `#0f766e`
+  accent) defined as CSS custom properties in `src/index.css`; there is
+  deliberately no dark variant.
+- Serif display headings come from system fonts (`Iowan Old Style`/Palatino/
+  Georgia), body copy from the system sans stack — no webfonts are downloaded.
+- All component styling lives in `src/App.css` (masonry, cards, paging, states,
+  lightbox, zoom). No CSS framework or CSS-in-JS.
+- The Vite template's demo styles and assets were removed; only `favicon.svg`
+  remains in `public/`.
 
 ## Smoke-testing the Drive setup
 

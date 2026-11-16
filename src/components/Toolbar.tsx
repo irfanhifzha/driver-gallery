@@ -25,8 +25,9 @@ export function Toolbar({
 
   return (
     <header className="toolbar">
-      <div>
-        <h1>Photo gallery</h1>
+      <div className="toolbar-heading">
+        <p className="eyebrow">Shared Drive folder</p>
+        <h1>Photo Gallery</h1>
         <p className="subtitle">{label}</p>
       </div>
       <div className="toolbar-actions">
