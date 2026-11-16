@@ -384,7 +384,7 @@ endpoints, and both are capped:
 
 | Where | URL | Ceiling |
 | --- | --- | --- |
-| Lightbox (`fullSrc`) | `drive.google.com/thumbnail?id=…&sz=w1600` | 1600 px **wide** (a portrait can be taller) |
+| Lightbox (`fullSrc`) | `drive.google.com/thumbnail?id=…&sz=w1600`, swapped to `sz=w2400` once zoomed | 1600 px **wide** normally, 2400 px after zoom (a portrait can be taller) |
 | Grid (`thumbSrcSet`) | `lh3.googleusercontent.com/…=s400 / =s800 / =s1600` | 1600×1600 box; browser picks per rendered width × DPR (see below) |
 
 - `sz=wN` scales the image to width `N`, preserving aspect ratio, and **never
@@ -414,6 +414,11 @@ Consequences:
   folders — a 1080 px-wide set looks identical to the original, while a 6000 px
   photo is delivered as 1600 px in the viewer.
 - At 5× zoom the lightbox shows interpolated pixels; that is the cap, not a bug.
+- **Dynamic detail:** when the viewer zoom × crop zoom reaches 2×, the lightbox
+  preloads the same file at `sz=w2400` and swaps it in only after it has loaded,
+  so opening stays on the 1600 px rendition and the sharper one costs one extra
+  download per photo per session. It is 1.5× wider than the base, never the
+  original file, and is remembered per file id while the tab is open.
 - Originals would need `files.get?alt=media` with OAuth.
 
 To raise the ceiling, change the default in `src/lib/drive.ts`

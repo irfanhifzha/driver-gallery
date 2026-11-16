@@ -23,6 +23,12 @@ import { metadataRows } from '../lib/metadata'
 const MIN_ZOOM = 1
 const MAX_ZOOM = 5
 const DOUBLE_CLICK_ZOOM = 2.5
+/** Default lightbox rendition width, served straight from Drive. */
+const BASE_WIDTH = 1600
+/** Sharper rendition fetched on zoom: 1.5x wider, still never the original. */
+const DETAIL_WIDTH = 2400
+/** Viewer zoom (times crop zoom) that makes the base rendition look soft. */
+const DETAIL_ZOOM = 2
 const PANEL_ID = 'lightbox-adjustments'
 const INFO_PANEL_ID = 'lightbox-info'
 const SHORTCUTS_PANEL_ID = 'lightbox-shortcuts'
@@ -112,6 +118,9 @@ export function Lightbox({
 
   const [failedId, setFailedId] = useState<string | null>(null)
   const [view, setView] = useState<View>(INITIAL_VIEW)
+  /** Photo currently showing the sharper rendition, once it has loaded. */
+  const [hiResId, setHiResId] = useState<string | null>(null)
+  const hiResTriedRef = useRef(new Set<string>())
   const [dragging, setDragging] = useState(false)
   /** Live horizontal offset while a swipe is in progress. */
   const [swipeX, setSwipeX] = useState(0)
@@ -504,14 +513,33 @@ export function Lightbox({
     zoomTo,
   ])
 
-  // Preload neighbours so ←/→ feels instant. Neighbours stay at thumbnail
-  // size; high-res images are only fetched for the photo being looked at.
+  // Preload neighbours so ←/→ feels instant. Neighbours stay at the base
+  // rendition; the sharper one is only fetched for the photo being looked at.
   useEffect(() => {
     for (const offset of [-1, 1]) {
       const neighbour = images[index + offset]
-      if (neighbour) new Image().src = fullSrc(neighbour.id)
+      if (neighbour) new Image().src = fullSrc(neighbour.id, BASE_WIDTH)
     }
   }, [images, index])
+
+  // Zooming past DETAIL_ZOOM swaps in a sharper rendition. It is preloaded
+  // first and then swapped, so the browser serves it from cache with no flash;
+  // it stays far below the original file size.
+  useEffect(() => {
+    if (!image || failed) return
+    const id = image.id
+    if (view.scale * (crop?.zoom ?? 1) < DETAIL_ZOOM) return
+    if (hiResTriedRef.current.has(id)) return
+    hiResTriedRef.current.add(id)
+
+    const probe = new Image()
+    // The signed thumbnail CDN answers 429 when a Referer is sent.
+    probe.referrerPolicy = 'no-referrer'
+    probe.onload = () => setHiResId(id)
+    // Let a later zoom try again rather than staying soft for the session.
+    probe.onerror = () => hiResTriedRef.current.delete(id)
+    probe.src = fullSrc(id, DETAIL_WIDTH)
+  }, [crop?.zoom, failed, image, view.scale])
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return
@@ -785,6 +813,11 @@ export function Lightbox({
   if (!image) return null
 
   const whiteBalanceStyle = whiteBalanceOverlay(adjustments)
+  // Preloaded, so this only costs the bytes once per photo.
+  const imageSrc = fullSrc(
+    image.id,
+    hiResId === image.id ? DETAIL_WIDTH : BASE_WIDTH,
+  )
 
   return (
     <div
@@ -1012,7 +1045,7 @@ export function Lightbox({
                   style={{ '--crop-ratio': displayCrop.ratio } as CSSProperties}
                 >
                   <img
-                    src={fullSrc(image.id)}
+                    src={imageSrc}
                     alt={image.name}
                     referrerPolicy="no-referrer"
                     draggable={false}
@@ -1029,7 +1062,7 @@ export function Lightbox({
                 </div>
               ) : (
                 <img
-                  src={fullSrc(image.id)}
+                  src={imageSrc}
                   alt={image.name}
                   referrerPolicy="no-referrer"
                   draggable={false}
