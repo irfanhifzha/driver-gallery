@@ -47,6 +47,17 @@ export function FolderBar({ folderId, onApply }: FolderBarProps) {
           Load folder
         </button>
 
+        {folderId ? (
+          <a
+            className="drive-link folder-drive"
+            href={`https://drive.google.com/drive/folders/${folderId}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open in Drive ↗
+          </a>
+        ) : null}
+
       </form>
 
       {error ? (

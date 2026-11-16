@@ -5,7 +5,7 @@ export type MetadataRow = { label: string; value: string }
 const UNITS = ['B', 'KB', 'MB', 'GB', 'TB']
 
 /** Drive returns `size` as a byte string; show the largest sensible unit. */
-export function formatFileSize(size?: string) {
+function formatBytes(size?: string) {
   const bytes = Number(size)
   if (!size || !Number.isFinite(bytes) || bytes <= 0) return null
 
@@ -82,7 +82,7 @@ export function metadataRows(image: DriveImage): MetadataRow[] {
 
   add('File', image.name)
   add('Type', fileType(image))
-  add('Size', formatFileSize(image.size))
+  add('Size', formatBytes(image.size))
   if (meta.width && meta.height) {
     add('Dimensions', `${meta.width} × ${meta.height} px`)
   }

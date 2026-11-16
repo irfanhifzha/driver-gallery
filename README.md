@@ -64,8 +64,6 @@ content through the API.
 | Loading or refreshing a folder | **one** `files.list` per 1000 files | 100 quota units |
 | Scrolling, paging, filtering, search, RAW toggle | none (client-side) | 0 |
 | Opening the lightbox / grid thumbnails | none — signed CDN URLs | 0 |
-| High-quality toggle (opt-in) | none — signed CDN URL, no API key | 0 |
-| "Original in Drive" link | none — Google's own page | 0 |
 | File info panel, zoom, adjustments | none (same listing data) | 0 |
 
 - A 70-photo folder is a single `files.list` → **100 quota units**, cached in
@@ -176,7 +174,8 @@ src/
    browser picks a size for the column width. Those are pre-signed
    `lh3.googleusercontent.com` URLs and cost **zero** API calls. The lightbox
    uses `fullSrc(id)` (`drive.google.com/thumbnail?id=…&sz=w1600`). Neither
-   path ever fetches the original — see [Image resolution](#image-resolution).
+   path ever fetches the original file — see
+   [Image resolution](#image-resolution).
 5. The listing is shuffled in `useDriveImages`, and `imageMediaMetadata`
    width/height (requested in `FIELDS`) sets each tile's aspect ratio, so the
    masonry order changes per visit while the layout reserves space before load.
@@ -216,7 +215,9 @@ src/
   HEIC and expired thumbnails).
 - Lightbox: fixed overlay, `role="dialog"`, `aria-modal`, focus moved to the close
   button and restored on close, body scroll locked, Tab trapped, Esc closes,
-  arrows navigate, neighbours preloaded, edge arrows disabled.
+  arrows navigate, neighbours preloaded, edge arrows disabled. The photo has
+  square corners and fills the viewport height; the filename, position, zoom
+  factor, and control hint sit in a top-left overlay instead of under the image.
 - Live adjustments: **Adjust** opens a panel with brightness (50–150 %),
   contrast (50–150 %), saturation (0–200 %), tint hue (0–360°) and tint strength
   (0–100 %) sliders. Changes render instantly: a `filter` chain on the image plus
@@ -225,15 +226,6 @@ src/
   `filter: …` string, with Reset, and is preview-only — nothing is saved,
   exported, or written to Drive. Esc closes the panel before the viewer, and
   settings reset when changing photos.
-- High quality (opt-in): the lightbox always loads the 1600 px thumbnail first.
-  **High quality** preloads the original (`=s0` when the file has a signed
-  thumbnail link, else `sz=w3200`) off-screen and swaps it in only once it
-  decodes, so the thumbnail never blanks out. The pill shows the original file
-  size before loading, remembers the choice for the browser session
-  (`sessionStorage["drive-gallery:highres"]`), and falls back to the thumbnail
-  with a retryable note if the large image fails. **Original in Drive** opens
-  the file in Drive for real downloads and for RAW/NEF. Neither action is a
-  Drive API call.
 - File info: **Info** in the lightbox opens a panel with file name, type, size,
   pixel dimensions, capture time, camera and lens, exposure time, aperture, ISO,
   focal length, flash, GPS coordinates, and modified date. Fields Drive does not
@@ -283,7 +275,8 @@ The folder bar above the gallery accepts either a raw Drive folder ID or a paste
 link containing `/folders/<id>` (e.g.
 `https://drive.google.com/drive/folders/1AbC...`). **Load folder** validates it,
 stores it in `localStorage["drive-gallery:folder"]`, and remounts the gallery for
-that folder. There is no env-configured default folder to fall back to.
+that folder. **Open in Drive ↗** next to the form opens the current folder in
+Google Drive. There is no env-configured default folder to fall back to.
 
 - The folder must be public (**Anyone with the link → Viewer**); being shared
   with your account only is not enough for the API-key model.
@@ -364,16 +357,11 @@ Consequences:
 - At 5× zoom the lightbox shows interpolated pixels; that is the cap, not a bug.
 - Originals would need `files.get?alt=media` with OAuth.
 
-The lightbox keeps `sz=w1600` as the default and offers an opt-in **High
-quality** toggle (see [UI behaviour](#ui-behaviour)) that requests `=s0` when a
-signed `thumbnailLink` exists — this returned the **exact original bytes**
-(2,053,200 bytes for the file above) with no extra API call — and falls back to
-`sz=w3200` otherwise. Signed URLs expire after a few hours, and neither source
-costs Drive API quota.
-
-To change the defaults instead of toggling, edit `fullSrc(id, w = 1600)` or
-`highResSrc()` in `src/lib/drive.ts`; the endpoint accepts larger widths such as
-`sz=w2400` at the cost of a bigger download.
+To raise the ceiling, change the default in `src/lib/drive.ts`
+(`fullSrc(id, w = 1600)`) or the lightbox call site; the endpoint accepts larger
+widths such as `sz=w2400`, at the cost of a bigger download. Drive renders
+thumbnails through a separate pipeline though, so a larger `sz` is not
+guaranteed to be honoured for every file.
 
 ## Supported image formats
 
@@ -493,7 +481,6 @@ the current model (public folder, API key, static site, no backend).
 - Favorites / shortlist in `localStorage`, with a "Favorites" filter.
 - A `?` keyboard-shortcut overlay covering arrows, Esc, and zoom keys.
 - Optional infinite scroll alongside numbered pages (page number in the URL).
-- Higher-resolution viewing and an "Original" link — see [`TODO.md`](./TODO.md).
 - Tests: unit tests for filtering, RAW dedupe, and adjustment helpers; a small
   browser smoke test for folder switching and the lightbox.
 - Production deployment (static host + referrer allowlist + env vars).

@@ -147,26 +147,20 @@ export function Gallery({ folderId }: GalleryProps) {
               </div>
             ) : null}
 
-            <div className="gallery-footer">
-              {error ? (
-                <p className="inline-error" role="alert">
-                  {error}
-                </p>
-              ) : null}
-              {loading && hasImages ? (
-                <p className="muted" role="status">
-                  Loading all photos…
-                </p>
-              ) : null}
-              <a
-                className="drive-link"
-                href={`https://drive.google.com/drive/folders/${folderId}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Open folder in Drive ↗
-              </a>
-            </div>
+            {error || (loading && hasImages) ? (
+              <div className="gallery-footer">
+                {error ? (
+                  <p className="inline-error" role="alert">
+                    {error}
+                  </p>
+                ) : null}
+                {loading && hasImages ? (
+                  <p className="muted" role="status">
+                    Loading all photos…
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </>
         ) : null}
       </main>

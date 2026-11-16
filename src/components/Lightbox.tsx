@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
-import { fullSrc, highResSrc, type DriveImage } from '../lib/drive'
+import { fullSrc, type DriveImage } from '../lib/drive'
 import {
   DEFAULT_ADJUSTMENTS,
   filterCss,
@@ -9,35 +9,13 @@ import {
 } from '../lib/adjustments'
 import { AdjustPanel } from './AdjustPanel'
 import { InfoPanel } from './InfoPanel'
-import { formatFileSize, metadataRows } from '../lib/metadata'
+import { metadataRows } from '../lib/metadata'
 
 const MIN_ZOOM = 1
 const MAX_ZOOM = 5
 const DOUBLE_CLICK_ZOOM = 2.5
 const PANEL_ID = 'lightbox-adjustments'
 const INFO_PANEL_ID = 'lightbox-info'
-const QUALITY_KEY = 'drive-gallery:highres'
-
-type Quality = 'thumbnail' | 'high'
-
-function readQualityPreference(): Quality {
-  try {
-    return sessionStorage.getItem(QUALITY_KEY) === 'high'
-      ? 'high'
-      : 'thumbnail'
-  } catch {
-    return 'thumbnail'
-  }
-}
-
-function writeQualityPreference(high: boolean) {
-  try {
-    if (high) sessionStorage.setItem(QUALITY_KEY, 'high')
-    else sessionStorage.removeItem(QUALITY_KEY)
-  } catch {
-    // Private mode: the choice simply won't persist.
-  }
-}
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value))
@@ -82,39 +60,11 @@ export function Lightbox({
     useState<Adjustments>(DEFAULT_ADJUSTMENTS)
   const [adjustOpen, setAdjustOpen] = useState(false)
   const [infoOpen, setInfoOpen] = useState(false)
-  const [quality, setQuality] = useState<Quality>(readQualityPreference)
-  const [loadedHighRes, setLoadedHighRes] = useState<{
-    id: string
-    url: string
-  } | null>(null)
-  const [failedQualityId, setFailedQualityId] = useState<string | null>(null)
-  const [retry, setRetry] = useState(0)
 
   const image = images[index]
   const failed = image ? failedId === image.id : false
   const hasPrev = index > 0
   const hasNext = index < images.length - 1
-
-  // High quality is opt-in and only one photo's worth of bytes is fetched at a
-  // time, so a failed or still-loading load never blanks the thumbnail out.
-  const highResUrl =
-    loadedHighRes && loadedHighRes.id === image?.id ? loadedHighRes.url : null
-  const showHighRes = quality === 'high' ? highResUrl : null
-  const failedQuality =
-    quality === 'high' && failedQualityId === image?.id
-  const highLoading = quality === 'high' && !showHighRes && !failedQuality
-  const sizeLabel = image ? formatFileSize(image.size) : null
-
-  const toggleQuality = () => {
-    if (failedQuality) {
-      setFailedQualityId(null)
-      setRetry((count) => count + 1)
-      return
-    }
-    const next: Quality = quality === 'high' ? 'thumbnail' : 'high'
-    setQuality(next)
-    writeQualityPreference(next === 'high')
-  }
 
   const resetZoom = useCallback(() => {
     dragRef.current = null
@@ -339,43 +289,6 @@ export function Lightbox({
     }
   }, [images, index])
 
-  // Decode the high-res image off-screen, then swap it in. Keeping this in an
-  // effect (rather than on click) means a remembered preference also applies
-  // to the next photo without the thumbnail flashing away.
-  useEffect(() => {
-    if (quality !== 'high' || !image) return
-    // Already decoded for this photo (toggled off and back on): reuse it.
-    if (loadedHighRes?.id === image.id) return
-
-    const id = image.id
-    const url = highResSrc(image)
-    let cancelled = false
-    const probe = new Image()
-    probe.referrerPolicy = 'no-referrer'
-
-    probe.onload = () => {
-      if (cancelled) return
-      setLoadedHighRes({ id, url })
-      setFailedQualityId(null)
-    }
-    probe.onerror = () => {
-      if (cancelled) return
-      console.error('[drive-gallery] high quality failed to load', {
-        name: image.name,
-        id,
-        url,
-      })
-      setFailedQualityId(id)
-    }
-    probe.src = url
-
-    return () => {
-      cancelled = true
-      probe.onload = null
-      probe.onerror = null
-    }
-  }, [image, quality, loadedHighRes, retry])
-
   const handlePointerDown = (event: ReactPointerEvent<HTMLImageElement>) => {
     if (view.scale <= MIN_ZOOM) return
     event.preventDefault()
@@ -464,6 +377,19 @@ export function Lightbox({
         Info
       </button>
 
+      <div className="lightbox-meta">
+        <span className="lightbox-name">{image.name}</span>
+        <span className="lightbox-count">
+          {index + 1} / {images.length}
+          {view.scale > MIN_ZOOM ? ` · ${view.scale.toFixed(1)}×` : ''}
+        </span>
+        {failed ? null : (
+          <span className="lightbox-hint">
+            Scroll to zoom · drag to pan · double-click to reset
+          </span>
+        )}
+      </div>
+
       <button
         type="button"
         className="lightbox-nav lightbox-prev"
@@ -501,7 +427,7 @@ export function Lightbox({
               }}
             >
               <img
-                src={showHighRes ?? fullSrc(image.id)}
+                src={fullSrc(image.id)}
                 alt={image.name}
                 referrerPolicy="no-referrer"
                 draggable={false}
@@ -516,17 +442,6 @@ export function Lightbox({
                 }}
                 onDragStart={(event) => event.preventDefault()}
                 onError={() => {
-                  // An expired `=s0` link is not a broken photo: drop back to
-                  // the thumbnail and let the toggle offer a retry.
-                  if (showHighRes) {
-                    console.error(
-                      '[drive-gallery] high quality image failed, using thumbnail',
-                      { name: image.name, id: image.id },
-                    )
-                    setFailedQualityId(image.id)
-                    setLoadedHighRes(null)
-                    return
-                  }
                   console.error(
                     '[drive-gallery] lightbox image failed to load',
                     {
@@ -552,56 +467,6 @@ export function Lightbox({
             </div>
           )}
         </div>
-
-        <figcaption>
-          <span className="lightbox-name">{image.name}</span>
-          <span className="lightbox-count">
-            {index + 1} / {images.length}
-            {view.scale > MIN_ZOOM
-              ? ` · ${view.scale.toFixed(1)}×`
-              : ''}
-          </span>
-        </figcaption>
-
-        {failed ? null : (
-          <div className="lightbox-tools">
-            <button
-              type="button"
-              className="lightbox-tool"
-              onClick={toggleQuality}
-              aria-pressed={quality === 'high'}
-              disabled={highLoading}
-            >
-              {highLoading
-                ? 'Loading high quality…'
-                : showHighRes
-                  ? 'High quality ✓'
-                  : failedQuality
-                    ? 'Retry high quality'
-                    : `High quality${sizeLabel ? ` · ${sizeLabel}` : ''}`}
-            </button>
-            <a
-              className="lightbox-tool"
-              href={`https://drive.google.com/file/d/${image.id}/view`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Original in Drive ↗
-            </a>
-          </div>
-        )}
-
-        {failedQuality ? (
-          <p className="lightbox-quality-note" role="status">
-            High quality unavailable — showing the thumbnail.
-          </p>
-        ) : null}
-
-        {failed ? null : (
-          <p className="lightbox-hint">
-            Scroll to zoom · drag to pan · double-click to reset
-          </p>
-        )}
       </figure>
 
       <button

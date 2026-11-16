@@ -151,18 +151,7 @@ export const aspectRatio = (f: DriveImage) => {
 /** Public files only — safe in <img>, no auth header, no CORS dance. */
 export const fullSrc = (id: string, w = 1600) =>
   `https://drive.google.com/thumbnail?id=${id}&sz=w${w}`
-
-/**
- * Opt-in high-quality source. The signed thumbnail link accepts `=s0`, which
- * returns the original bytes; when a file has no thumbnail link, fall back to
- * a wide `sz=w` render. Both are CDN URLs, so neither costs Drive API quota.
- */
-export const highResSrc = (f: DriveImage) => {
-  const original = f.thumbnailLink?.replace(/=s\d+(-c)?$/, "=s0")
-  return original && original !== f.thumbnailLink
-    ? original
-    : fullSrc(f.id, 3200)
-};
+;
 
 /** `srcSet` for the Drive thumbnail endpoint, used as the retry fallback. */
 export const fullSrcSet = (id: string) =>
