@@ -39,7 +39,8 @@ what it stores, what it renders, and what it never does. For setup see
    repeat visit within 5 minutes reads that cache instead of calling Drive.
 5. **Shuffle.** The listing is shuffled in memory so the masonry pattern differs
    per load. Only the complete listing is cached; the shuffle happens at read.
-6. **Render.** 24 photos per page are laid out as a CSS-columns masonry. Filters,
+6. **Render.** 24 photos per page are laid out as an order-preserving masonry
+   (explicit columns, so the visible order follows the selected sort). Filters,
    search, RAW-duplicate hiding, and pagination are all done in the browser over
    the cached array — no extra requests.
 7. **Grid images.** Each card renders `thumbnailLink` as `srcSet` candidates
@@ -50,8 +51,10 @@ what it stores, what it renders, and what it never does. For setup see
    `drive.google.com/thumbnail?id=…&sz=w1600` (`fullSrc`) and preloads the two
    neighbours at the same size. Its top-left overlay links the file to
    `drive.google.com/file/d/<id>/view` in a new tab.
-9. **Zoom.** CSS `transform: translate() scale()` on the already-loaded bitmap,
-   1×–5×. Zooming does **not** download anything new.
+9. **Zoom & swipe.** CSS `transform: translate() scale()` on the already-loaded
+   bitmap, 1×–5×. Pinch zooms around the fingers; at 1× a horizontal swipe
+   changes photos, while zoomed it pans. Zooming does **not** download anything
+   new.
 10. **Adjust.** Brightness/contrast/saturation are a CSS `filter`; temperature
     and tint are blend overlays inside the zoom transform. Preview only — no
     request, no upload, no saved file. Settings reset when changing photos and

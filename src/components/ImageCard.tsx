@@ -63,7 +63,7 @@ export function ImageCard({
   }
 
   return (
-    <li className="grid-item">
+    <div className="grid-item">
       <button
         type="button"
         className={`card card-${status}`}
@@ -122,6 +122,6 @@ export function ImageCard({
           />
         </svg>
       </button>
-    </li>
+    </div>
   )
 }

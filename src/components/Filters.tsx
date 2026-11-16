@@ -87,81 +87,89 @@ export function Filters({
         ) : null}
       </div>
 
-      <label className="type-filter">
-        <span className="type-filter-label">Type</span>
-        <select
-          className="type-select"
-          value={type}
-          onChange={(event) => onTypeChange(event.target.value)}
-        >
-          <option value="all">All types</option>
-          {types.map((option) => (
-            <option key={option.label} value={option.label}>
-              {option.label} ({option.count})
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="filters-group" role="group" aria-label="Filter photos">
+        <label className="type-filter">
+          <span className="type-filter-label">Type</span>
+          <select
+            className="type-select"
+            value={type}
+            onChange={(event) => onTypeChange(event.target.value)}
+          >
+            <option value="all">All types</option>
+            {types.map((option) => (
+              <option key={option.label} value={option.label}>
+                {option.label} ({option.count})
+              </option>
+            ))}
+          </select>
+        </label>
 
-      <button
-        type="button"
-        className={`favorites-filter${favoritesOnly ? ' is-active' : ''}`}
-        aria-pressed={favoritesOnly}
-        onClick={() => onToggleFavorites(!favoritesOnly)}
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path
-            d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"
-            fill={favoritesOnly ? 'currentColor' : 'none'}
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinejoin="round"
-          />
-        </svg>
-        Favorites{favoriteCount > 0 ? ` (${favoriteCount})` : ''}
-      </button>
-
-      {totalFavorites > 0 ? (
         <button
           type="button"
-          className="favorites-clear"
-          onClick={onClearFavorites}
+          className={`favorites-filter${favoritesOnly ? ' is-active' : ''}`}
+          aria-pressed={favoritesOnly}
+          onClick={() => onToggleFavorites(!favoritesOnly)}
         >
-          Clear favorites
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path
+              d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"
+              fill={favoritesOnly ? 'currentColor' : 'none'}
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinejoin="round"
+            />
+          </svg>
+          Favorites{favoriteCount > 0 ? ` (${favoriteCount})` : ''}
         </button>
-      ) : null}
 
-      <label className="sort-filter">
-        <span className="type-filter-label">Order</span>
-        <select
-          className="type-select"
-          value={sortKey}
-          onChange={(event) => onSortKeyChange(event.target.value)}
-          aria-label="Sort photos by"
-        >
-          <option value="name">Name</option>
-          <option value="modified">Date modified</option>
-          <option value="size">Size</option>
-          <option value="type">Type</option>
-        </select>
-      </label>
+        {totalFavorites > 0 ? (
+          <button
+            type="button"
+            className="favorites-clear"
+            onClick={onClearFavorites}
+          >
+            Clear favorites
+          </button>
+        ) : null}
 
-      <button
-        type="button"
-        className="sort-dir"
-        aria-label={sortDir === 'asc' ? 'Sort ascending' : 'Sort descending'}
-        onClick={() =>
-          onSortDirChange(sortDir === 'asc' ? 'desc' : 'asc')
-        }
+        {isFiltering ? (
+          <button type="button" className="filter-reset" onClick={onReset}>
+            Reset
+          </button>
+        ) : null}
+      </div>
+
+      <div
+        className="filters-group filters-sort"
+        role="group"
+        aria-label="Sort photos"
       >
-        {sortDir === 'asc' ? '↑' : '↓'}
-      </button>
+        <label className="sort-filter">
+          <span className="type-filter-label">Order</span>
+          <select
+            className="type-select"
+            value={sortKey}
+            onChange={(event) => onSortKeyChange(event.target.value)}
+            aria-label="Sort photos by"
+          >
+            <option value="name">Name</option>
+            <option value="modified">Date modified</option>
+            <option value="size">Size</option>
+            <option value="type">Type</option>
+          </select>
+        </label>
 
-      {isFiltering ? (
-        <button type="button" className="filter-reset" onClick={onReset}>
-          Reset
+        <button
+          type="button"
+          className="sort-dir"
+          aria-label={sortDir === 'asc' ? 'Sort ascending' : 'Sort descending'}
+          onClick={() =>
+            onSortDirChange(sortDir === 'asc' ? 'desc' : 'asc')
+          }
+        >
+          {sortDir === 'asc' ? '↑' : '↓'}
         </button>
-      ) : null}
+      </div>
     </div>
   )
 }

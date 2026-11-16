@@ -203,6 +203,19 @@
   padding-bottom: 20px;
 }
 
+.filters-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Keep sorting on the far right so filters and ordering read as two groups. */
+.filters-sort {
+  margin-left: auto;
+}
+
 .search-field {
   position: relative;
   display: flex;
@@ -418,24 +431,25 @@
 
 /* ---------- Masonry grid ---------- */
 
+/* Order-preserving masonry: ImageGrid distributes the sorted list across
+   explicit columns, so DOM and visual order stay in sync. */
 .grid {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  column-count: 3;
-  column-gap: 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
 }
 
-@media (max-width: 1000px) {
-  .grid {
-    column-count: 2;
-  }
+.grid-column {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+  gap: 14px;
 }
 
 .grid-item {
   position: relative;
-  break-inside: avoid;
-  margin: 0 0 14px;
+  min-width: 0;
 }
 
 .favorite-toggle {
@@ -783,6 +797,8 @@
   inset: 0;
   background: rgba(14, 12, 10, 0.94);
   backdrop-filter: blur(6px);
+  /* Pinching the empty surround should not zoom the whole page. */
+  touch-action: none;
 }
 
 .lightbox-figure {
@@ -804,6 +820,8 @@
   max-width: 100%;
   max-height: calc(100svh - 48px);
   background: rgba(255, 255, 255, 0.03);
+  /* Let pointer events drive swipe and pinch instead of browser pan/zoom. */
+  touch-action: none;
 }
 
 .lightbox-image {
@@ -824,12 +842,18 @@
   cursor: grabbing;
 }
 
+/* Partial swipes animate back to centre; active gestures must stay immediate. */
+.lightbox-image.is-settling {
+  transition: transform 0.2s ease;
+}
+
 .lightbox-image img {
   display: block;
   max-width: 100%;
   max-height: calc(100svh - 48px);
   user-select: none;
   -webkit-user-select: none;
+  -webkit-touch-callout: none;
   touch-action: none;
 }
 
@@ -1253,6 +1277,14 @@
     gap: 10px;
   }
 
+  .filters-group {
+    gap: 8px;
+  }
+
+  .filters-sort {
+    margin-left: 0;
+  }
+
   .folder-form {
     gap: 8px;
   }
@@ -1265,12 +1297,9 @@
     flex-basis: 100%;
   }
 
-  .grid {
-    column-gap: 8px;
-  }
-
-  .grid-item {
-    margin-bottom: 8px;
+  .grid,
+  .grid-column {
+    gap: 8px;
   }
 
   .favorite-toggle {

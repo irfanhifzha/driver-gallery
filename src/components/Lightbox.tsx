@@ -54,6 +54,26 @@ export function Lightbox({
     originY: number
   } | null>(null)
 
+  // Active touch/mouse pointers, keyed by pointer id, for swipe and pinch.
+  const pointersRef = useRef(new Map<number, { x: number; y: number }>())
+  const pinchRef = useRef<{
+    startDistance: number
+    startScale: number
+    startX: number
+    startY: number
+    centerX: number
+    centerY: number
+  } | null>(null)
+  const swipeRef = useRef<{
+    pointerId: number
+    startX: number
+    startY: number
+  } | null>(null)
+  /** The gesture turned into a pinch; its remaining finger must not navigate. */
+  const pinchedRef = useRef(false)
+  const swipeMovedRef = useRef(false)
+  const settleTimerRef = useRef<number | undefined>(undefined)
+
   const adjustButtonRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLElement>(null)
   const infoButtonRef = useRef<HTMLButtonElement>(null)
@@ -62,6 +82,9 @@ export function Lightbox({
   const [failedId, setFailedId] = useState<string | null>(null)
   const [view, setView] = useState<View>(INITIAL_VIEW)
   const [dragging, setDragging] = useState(false)
+  /** Live horizontal offset while a swipe is in progress. */
+  const [swipeX, setSwipeX] = useState(0)
+  const [settling, setSettling] = useState(false)
   const [adjustments, setAdjustments] =
     useState<Adjustments>(DEFAULT_ADJUSTMENTS)
   const [adjustOpen, setAdjustOpen] = useState(false)
@@ -75,7 +98,19 @@ export function Lightbox({
   const resetZoom = useCallback(() => {
     dragRef.current = null
     setDragging(false)
+    setSwipeX(0)
+    setSettling(false)
     setView(INITIAL_VIEW)
+  }, [])
+
+  /** Animate a partial swipe back to centre; clear the timer on the next one. */
+  const settleSwipe = useCallback(() => {
+    if (!swipeMovedRef.current) return
+    swipeMovedRef.current = false
+    setSettling(true)
+    setSwipeX(0)
+    window.clearTimeout(settleTimerRef.current)
+    settleTimerRef.current = window.setTimeout(() => setSettling(false), 220)
   }, [])
 
   const resetAdjustments = useCallback(() => {
@@ -169,6 +204,8 @@ export function Lightbox({
     },
     [],
   )
+
+  useEffect(() => () => window.clearTimeout(settleTimerRef.current), [])
 
   // Lock body scroll, move focus in, and give it back on close.
   useEffect(() => {
@@ -295,46 +332,210 @@ export function Lightbox({
     }
   }, [images, index])
 
-  const handlePointerDown = (event: ReactPointerEvent<HTMLImageElement>) => {
-    if (view.scale <= MIN_ZOOM) return
-    event.preventDefault()
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+
     event.currentTarget.setPointerCapture(event.pointerId)
-    dragRef.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      originX: view.x,
-      originY: view.y,
-    }
-    setDragging(true)
-  }
-
-  const handlePointerMove = (event: ReactPointerEvent<HTMLImageElement>) => {
-    const drag = dragRef.current
-    if (!drag || drag.pointerId !== event.pointerId) return
-
-    setView((prev) => {
-      const media = mediaRef.current
-      if (!media) return prev
-
-      const rect = media.getBoundingClientRect()
-      const maxX = Math.max(0, (rect.width * prev.scale - rect.width) / 2)
-      const maxY = Math.max(0, (rect.height * prev.scale - rect.height) / 2)
-
-      return {
-        ...prev,
-        x: clamp(drag.originX + event.clientX - drag.startX, -maxX, maxX),
-        y: clamp(drag.originY + event.clientY - drag.startY, -maxY, maxY),
-      }
+    pointersRef.current.set(event.pointerId, {
+      x: event.clientX,
+      y: event.clientY,
     })
+
+    if (pointersRef.current.size === 2) {
+      // A second finger turns the gesture into a pinch; drop any pan or swipe.
+      dragRef.current = null
+      swipeRef.current = null
+      swipeMovedRef.current = false
+      setDragging(false)
+      setSettling(false)
+      setSwipeX(0)
+      pinchedRef.current = true
+
+      const [first, second] = [...pointersRef.current.values()]
+      pinchRef.current = {
+        startDistance: Math.hypot(first.x - second.x, first.y - second.y),
+        startScale: view.scale,
+        startX: view.x,
+        startY: view.y,
+        centerX: (first.x + second.x) / 2,
+        centerY: (first.y + second.y) / 2,
+      }
+      return
+    }
+
+    if (pointersRef.current.size !== 1) return
+
+    if (view.scale > MIN_ZOOM) {
+      dragRef.current = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        originX: view.x,
+        originY: view.y,
+      }
+      setDragging(true)
+    } else {
+      swipeRef.current = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+      }
+      swipeMovedRef.current = false
+    }
   }
 
-  const endDrag = (event: ReactPointerEvent<HTMLImageElement>) => {
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const point = pointersRef.current.get(event.pointerId)
+    if (!point) return
+
+    point.x = event.clientX
+    point.y = event.clientY
+
+    const pinch = pinchRef.current
+    if (pinch && pointersRef.current.size >= 2) {
+      const [first, second] = [...pointersRef.current.values()]
+      const distance = Math.hypot(first.x - second.x, first.y - second.y)
+      if (distance < 1 || pinch.startDistance < 1) return
+
+      event.preventDefault()
+      const centerX = (first.x + second.x) / 2
+      const centerY = (first.y + second.y) / 2
+
+      setView((prev) => {
+        const media = mediaRef.current
+        if (!media) return prev
+
+        const rect = media.getBoundingClientRect()
+        const scale = clamp(
+          pinch.startScale * (distance / pinch.startDistance),
+          MIN_ZOOM,
+          MAX_ZOOM,
+        )
+        const frameCenterX = rect.left + rect.width / 2
+        const frameCenterY = rect.top + rect.height / 2
+
+        // Keep the content that was under the fingers pinned to their midpoint.
+        const contentX =
+          (pinch.centerX - frameCenterX - pinch.startX) / pinch.startScale
+        const contentY =
+          (pinch.centerY - frameCenterY - pinch.startY) / pinch.startScale
+
+        let x = centerX - frameCenterX - contentX * scale
+        let y = centerY - frameCenterY - contentY * scale
+
+        const maxX = Math.max(0, (rect.width * scale - rect.width) / 2)
+        const maxY = Math.max(0, (rect.height * scale - rect.height) / 2)
+
+        if (scale === MIN_ZOOM) {
+          x = 0
+          y = 0
+        }
+
+        return {
+          scale,
+          x: clamp(x, -maxX, maxX),
+          y: clamp(y, -maxY, maxY),
+        }
+      })
+      return
+    }
+
+    const drag = dragRef.current
+    if (drag && drag.pointerId === event.pointerId) {
+      event.preventDefault()
+      setView((prev) => {
+        const media = mediaRef.current
+        if (!media) return prev
+
+        const rect = media.getBoundingClientRect()
+        const maxX = Math.max(0, (rect.width * prev.scale - rect.width) / 2)
+        const maxY = Math.max(0, (rect.height * prev.scale - rect.height) / 2)
+
+        return {
+          ...prev,
+          x: clamp(drag.originX + event.clientX - drag.startX, -maxX, maxX),
+          y: clamp(drag.originY + event.clientY - drag.startY, -maxY, maxY),
+        }
+      })
+      return
+    }
+
+    const swipe = swipeRef.current
+    if (swipe && swipe.pointerId === event.pointerId) {
+      const dx = event.clientX - swipe.startX
+      const dy = event.clientY - swipe.startY
+
+      // Only track a horizontal gesture; vertical drags do nothing here.
+      if (Math.abs(dx) > Math.abs(dy)) {
+        event.preventDefault()
+        swipeMovedRef.current = true
+        setSettling(false)
+        setSwipeX(clamp(dx, -160, 160))
+      }
+    }
+  }
+
+  const finishPointer = (
+    event: ReactPointerEvent<HTMLDivElement>,
+    cancelled = false,
+  ) => {
+    const swipe = swipeRef.current
+    pointersRef.current.delete(event.pointerId)
+
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
+
+    // Leaving one finger down after a pinch must not become a pan or swipe.
+    if (pinchRef.current && pointersRef.current.size < 2) {
+      pinchRef.current = null
+    }
+    if (pointersRef.current.size > 0) {
+      if (pinchedRef.current) {
+        dragRef.current = null
+        setDragging(false)
+      }
+      if (swipe && swipe.pointerId === event.pointerId) swipeRef.current = null
+      return
+    }
+
     dragRef.current = null
     setDragging(false)
+
+    const wasPinched = pinchedRef.current
+    pinchedRef.current = false
+    if (swipe && swipe.pointerId === event.pointerId) swipeRef.current = null
+
+    if (cancelled || wasPinched || !swipe) {
+      settleSwipe()
+      return
+    }
+
+    const dx = event.clientX - swipe.startX
+    const dy = event.clientY - swipe.startY
+    const media = mediaRef.current
+    const threshold = media
+      ? Math.max(48, Math.min(96, media.getBoundingClientRect().width * 0.15))
+      : 48
+    const horizontal =
+      Math.abs(dx) >= threshold && Math.abs(dx) > Math.abs(dy) * 1.2
+
+    if (horizontal && dx < 0 && hasNext) {
+      swipeMovedRef.current = false
+      setSettling(false)
+      setSwipeX(0)
+      goNext()
+      return
+    }
+    if (horizontal && dx > 0 && hasPrev) {
+      swipeMovedRef.current = false
+      setSettling(false)
+      setSwipeX(0)
+      goPrev()
+      return
+    }
+
+    settleSwipe()
   }
 
   if (!image) return null
@@ -442,7 +643,19 @@ export function Lightbox({
       </button>
 
       <figure className="lightbox-figure">
-        <div ref={mediaRef} className="lightbox-media">
+        <div
+          ref={mediaRef}
+          className="lightbox-media"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={(event) => finishPointer(event)}
+          onPointerCancel={(event) => finishPointer(event, true)}
+          onDoubleClick={(event) => {
+            zoomTo(event.clientX, event.clientY, (scale) =>
+              scale > MIN_ZOOM ? MIN_ZOOM : DOUBLE_CLICK_ZOOM,
+            )
+          }}
+        >
           {failed ? (
             <div className="lightbox-fallback" role="status">
               <p className="lightbox-name">{image.name}</p>
@@ -459,9 +672,11 @@ export function Lightbox({
             <div
               className={`lightbox-image${
                 view.scale > MIN_ZOOM ? ' is-zoomed' : ''
-              }${dragging ? ' is-dragging' : ''}`}
+              }${dragging ? ' is-dragging' : ''}${
+                settling ? ' is-settling' : ''
+              }`}
               style={{
-                transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
+                transform: `translate(${view.x + swipeX}px, ${view.y}px) scale(${view.scale})`,
                 filter: hasAdjustments(adjustments)
                   ? filterCss(adjustments)
                   : undefined,
@@ -472,15 +687,6 @@ export function Lightbox({
                 alt={image.name}
                 referrerPolicy="no-referrer"
                 draggable={false}
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={endDrag}
-                onPointerCancel={endDrag}
-                onDoubleClick={(event) => {
-                  zoomTo(event.clientX, event.clientY, (scale) =>
-                    scale > MIN_ZOOM ? MIN_ZOOM : DOUBLE_CLICK_ZOOM,
-                  )
-                }}
                 onDragStart={(event) => event.preventDefault()}
                 onError={() => {
                   console.error(

@@ -139,9 +139,9 @@ src/
 │  ├─ Gallery.tsx             # per-folder container: toolbar, filters, grid, pager
 │  ├─ Toolbar.tsx             # title, photo count, RAW toggle, refresh
 │  ├─ Filters.tsx             # search + type select + sort + Favorites toggle + reset
-│  ├─ ImageGrid.tsx           # <ul> grid of cards
+│  ├─ ImageGrid.tsx           # order-preserving masonry columns of cards
 │  ├─ ImageCard.tsx           # lazy <img>, shimmer skeleton, retry + onError fallback
-│  ├─ Lightbox.tsx            # full-size view, zoom/pan, adjust + info, ←/→/Esc
+│  ├─ Lightbox.tsx            # full-size view, swipe/pinch zoom/pan, adjust + info, ←/→/Esc
 │  ├─ AdjustPanel.tsx         # brightness/contrast/saturation/tint sliders
 │  ├─ InfoPanel.tsx           # file metadata panel (EXIF, size, dimensions)
 │  ├─ Pagination.tsx          # Prev/Next + numbered pages (24 per page)
@@ -211,10 +211,11 @@ src/
 
 ### UI behaviour
 
-- Grid: randomized masonry via CSS `column-count` (3 columns, 2 below 1000px),
-  so every photo is shown **uncropped at its natural aspect ratio** and columns
-  fill in a varied pattern. Cards reserve space from `imageMediaMetadata` while
-  loading; cards are real `<button>`s in a `<ul>`/`<li>` list.
+- Grid: randomized masonry in explicit columns (3 columns, 2 below 1000px), so
+  every photo is shown **uncropped at its natural aspect ratio** while the
+  visible top-to-bottom order follows the selected sort. Cards reserve space
+  from `imageMediaMetadata` while loading; cards are real `<button>`s inside
+  the column divs.
 - Card states: shimmer skeleton while loading, `onError` → filename tile (covers
   HEIC and expired thumbnails).
 - Lightbox: fixed overlay, `role="dialog"`, `aria-modal`, focus moved to the close
@@ -239,10 +240,12 @@ src/
   report are omitted, and everything comes from the single folder listing. Info
   and Adjust share the top-right corner, so opening one closes the other, and
   Esc closes the open panel before the viewer.
-- Zoom: the mouse wheel zooms 1×–5× around the cursor, dragging pans while
-  zoomed, double-click toggles 2.5×/1×, and `+`, `-`, `0` zoom in/out/reset from
-  the keyboard. The scaled image is clipped to its frame so it never covers the
-  caption or arrows; zoom resets when changing photos.
+- Zoom & touch: the mouse wheel zooms 1×–5× around the cursor, dragging pans
+  while zoomed, double-click (or double-tap) toggles 2.5×/1×, and `+`, `-`, `0`
+  zoom in/out/reset from the keyboard. On touch screens, pinch zooms 1×–5×
+  around the fingers and a horizontal one-finger swipe changes photos while at
+  1× (swiping pans while zoomed). The scaled image is clipped to its frame so it
+  never covers the caption or arrows; zoom resets when changing photos.
 - Search & type filter: the search field matches file names case-insensitively
   (with a clear button); the Type select lists only the types present in the
   folder with counts. Both combine with the RAW toggle and pagination, reset to
