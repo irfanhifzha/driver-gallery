@@ -290,7 +290,12 @@ q: `'${folderId}' in parents and trashed = false and (
 )`
 ```
 
-## Not implemented
+## Roadmap (not implemented)
 
-Plan nice-to-haves that remain open: sort by name/date, `?folder=` URL
-parameter, and production deployment (host + referrer allowlist + env vars).
+- **Live photo adjustments** — brightness, contrast, saturation, and tint sliders
+  in the lightbox. Preview only: nothing is saved, exported, or written back to
+  Drive. The detailed plan (controls, tint compositing, milestones, checks) lives
+  in [`TODO.md`](./TODO.md).
+- Sort by file name or modified date.
+- `?folder=` URL parameter so a link can open a specific folder.
+- Production deployment (host + referrer allowlist + env vars).
