@@ -163,6 +163,9 @@ export function Lightbox({
   const savedCrop = savedEdit?.crop ?? null
   const displayCrop =
     crop && (cropEditing || sameCrop(crop, savedCrop)) ? crop : null
+  // Sharpness is only requested past this threshold; keeping it a boolean means
+  // the preload runs once per photo instead of on every zoom tick.
+  const wantDetail = view.scale * (crop?.zoom ?? 1) >= DETAIL_ZOOM
 
   const resetZoom = useCallback(() => {
     dragRef.current = null
@@ -524,23 +527,23 @@ export function Lightbox({
 
   // Zooming past DETAIL_ZOOM swaps in a sharper rendition. Candidates are
   // preloaded in order and swapped only once loaded, so the browser serves the
-  // winner from cache with no flash.
+  // winner from cache with no flash. This deliberately depends on the boolean
+  // `wantDetail`, not on the zoom value: depending on the value tore the
+  // preload down on every wheel tick and the swap never landed.
   useEffect(() => {
-    if (!image || failed) return
+    if (!image || failed || !wantDetail) return
     const id = image.id
-    if (view.scale * (crop?.zoom ?? 1) < DETAIL_ZOOM) return
     if (hiResTriedRef.current.has(id)) return
     hiResTriedRef.current.add(id)
 
     // Drive sometimes ignores a requested width, so ask for the largest signed
     // rendition first and only then for an explicit 3200 px one.
     const candidates = [largestSrc(image), bestSrc(image, DETAIL_WIDTH)]
-    let cancelled = false
 
     const tryLoad = (index: number) => {
       const src = candidates[index]
-      if (cancelled || !src) {
-        if (!cancelled) hiResTriedRef.current.delete(id)
+      if (!src) {
+        hiResTriedRef.current.delete(id)
         return
       }
 
@@ -548,10 +551,11 @@ export function Lightbox({
       // The signed thumbnail CDN answers 429 when a Referer is sent.
       probe.referrerPolicy = 'no-referrer'
       probe.onload = () => {
-        if (cancelled) return
         console.info(
           `[drive-gallery] lightbox detail rendition ${probe.naturalWidth}x${probe.naturalHeight} from ${src}`,
         )
+        // Storing the id keeps this safe on navigation: the viewer only uses
+        // the sharp URL for the photo it is actually showing.
         setHiRes({ id, src })
       }
       probe.onerror = () => tryLoad(index + 1)
@@ -559,10 +563,7 @@ export function Lightbox({
     }
 
     tryLoad(0)
-    return () => {
-      cancelled = true
-    }
-  }, [crop?.zoom, failed, image, view.scale])
+  }, [failed, image, wantDetail])
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return
