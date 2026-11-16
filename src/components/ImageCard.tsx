@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
+import type { Crop } from '../lib/crop'
 import {
   aspectRatio,
   fullSrc,
@@ -13,6 +15,8 @@ type ImageCardProps = {
   index: number
   isFavorite: boolean
   isEdited: boolean
+  /** Saved crop, previewed so a card matches the lightbox. */
+  crop: Crop | null
   onOpen: (index: number) => void
   onToggleFavorite: (image: DriveImage) => void
 }
@@ -25,6 +29,7 @@ export function ImageCard({
   index,
   isFavorite,
   isEdited,
+  crop,
   onOpen,
   onToggleFavorite,
 }: ImageCardProps) {
@@ -32,6 +37,8 @@ export function ImageCard({
   const [status, setStatus] = useState<'loading' | 'ready' | 'failed'>('loading')
   const [attempt, setAttempt] = useState(0)
   const ratio = aspectRatio(image)
+  // A cropped card takes the crop's shape, so the grid shows what was saved.
+  const cardRatio = crop ? crop.ratio : ratio
   const retryTimer = useRef<number | undefined>(undefined)
 
   const primarySrc = thumb(image, 800) || fullSrc(image.id, 800)
@@ -71,9 +78,11 @@ export function ImageCard({
         className={`card card-${status}`}
         onClick={() => onOpen(index)}
         style={
-          status === 'ready' || !ratio
-            ? undefined
-            : { aspectRatio: String(ratio) }
+          crop
+            ? { aspectRatio: String(crop.ratio) }
+            : status === 'ready' || !cardRatio
+              ? undefined
+              : { aspectRatio: String(cardRatio) }
         }
       >
         {status !== 'failed' ? (
@@ -86,6 +95,16 @@ export function ImageCard({
             decoding="async"
             // The signed thumbnail CDN answers 429 when a Referer is sent.
             referrerPolicy="no-referrer"
+            className={crop ? 'is-cropped' : undefined}
+            style={
+              crop
+                ? ({
+                    '--crop-x': crop.x,
+                    '--crop-y': crop.y,
+                    '--crop-zoom': crop.zoom,
+                  } as CSSProperties)
+                : undefined
+            }
             onLoad={() => setStatus('ready')}
             onError={handleError}
           />

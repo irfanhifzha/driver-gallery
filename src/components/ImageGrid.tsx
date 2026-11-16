@@ -71,11 +71,13 @@ export function ImageGrid({
       }
 
       buckets[target].push({ image, index })
-      heights[target] += 1 / (aspectRatio(image) ?? FALLBACK_RATIO) + GAP_WEIGHT
+      // Cropped cards take the crop's shape, so balance columns by that shape.
+      const ratio = edits[image.id]?.crop?.ratio ?? aspectRatio(image)
+      heights[target] += 1 / (ratio ?? FALLBACK_RATIO) + GAP_WEIGHT
     })
 
     return buckets
-  }, [images, columnCount])
+  }, [images, edits, columnCount])
 
   return (
     <div className="grid">
@@ -88,6 +90,7 @@ export function ImageGrid({
               index={index}
               isFavorite={Boolean(favorites[image.id])}
               isEdited={Boolean(edits[image.id])}
+              crop={edits[image.id]?.crop ?? null}
               onOpen={onOpen}
               onToggleFavorite={onToggleFavorite}
             />
