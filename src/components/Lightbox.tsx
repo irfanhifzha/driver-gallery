@@ -3,7 +3,7 @@ import type {
   CSSProperties,
   PointerEvent as ReactPointerEvent,
 } from 'react'
-import { bestSrc, type DriveImage } from '../lib/drive'
+import { bestSrc, largestSrc, type DriveImage } from '../lib/drive'
 import type { FavoriteMap } from '../lib/favorites'
 import {
   DEFAULT_ADJUSTMENTS,
@@ -25,8 +25,8 @@ const MAX_ZOOM = 5
 const DOUBLE_CLICK_ZOOM = 2.5
 /** Default lightbox rendition width, from the same signed CDN as the grid. */
 const BASE_WIDTH = 1600
-/** Sharper rendition fetched on zoom: still never the original file. */
-const DETAIL_WIDTH = 2560
+/** Fallback width when the signed link cannot serve its largest rendition. */
+const DETAIL_WIDTH = 3200
 /** Viewer zoom (times crop zoom) that makes the base rendition look soft. */
 const DETAIL_ZOOM = 2
 const PANEL_ID = 'lightbox-adjustments'
@@ -118,8 +118,8 @@ export function Lightbox({
 
   const [failedId, setFailedId] = useState<string | null>(null)
   const [view, setView] = useState<View>(INITIAL_VIEW)
-  /** Photo currently showing the sharper rendition, once it has loaded. */
-  const [hiResId, setHiResId] = useState<string | null>(null)
+  /** Photo and URL of the sharper rendition, once it has loaded. */
+  const [hiRes, setHiRes] = useState<{ id: string; src: string } | null>(null)
   const hiResTriedRef = useRef(new Set<string>())
   const [dragging, setDragging] = useState(false)
   /** Live horizontal offset while a swipe is in progress. */
@@ -522,9 +522,9 @@ export function Lightbox({
     }
   }, [images, index])
 
-  // Zooming past DETAIL_ZOOM swaps in a sharper rendition. It is preloaded
-  // first and then swapped, so the browser serves it from cache with no flash;
-  // it stays far below the original file size.
+  // Zooming past DETAIL_ZOOM swaps in a sharper rendition. Candidates are
+  // preloaded in order and swapped only once loaded, so the browser serves the
+  // winner from cache with no flash.
   useEffect(() => {
     if (!image || failed) return
     const id = image.id
@@ -532,21 +532,36 @@ export function Lightbox({
     if (hiResTriedRef.current.has(id)) return
     hiResTriedRef.current.add(id)
 
-    const probe = new Image()
-    // The signed thumbnail CDN answers 429 when a Referer is sent.
-    probe.referrerPolicy = 'no-referrer'
-    probe.onload = () => {
-      console.info('[drive-gallery] lightbox detail rendition', {
-        name: image.name,
-        width: probe.naturalWidth,
-        requested: DETAIL_WIDTH,
-        src: probe.src,
-      })
-      setHiResId(id)
+    // Drive sometimes ignores a requested width, so ask for the largest signed
+    // rendition first and only then for an explicit 3200 px one.
+    const candidates = [largestSrc(image), bestSrc(image, DETAIL_WIDTH)]
+    let cancelled = false
+
+    const tryLoad = (index: number) => {
+      const src = candidates[index]
+      if (cancelled || !src) {
+        if (!cancelled) hiResTriedRef.current.delete(id)
+        return
+      }
+
+      const probe = new Image()
+      // The signed thumbnail CDN answers 429 when a Referer is sent.
+      probe.referrerPolicy = 'no-referrer'
+      probe.onload = () => {
+        if (cancelled) return
+        console.info(
+          `[drive-gallery] lightbox detail rendition ${probe.naturalWidth}x${probe.naturalHeight} from ${src}`,
+        )
+        setHiRes({ id, src })
+      }
+      probe.onerror = () => tryLoad(index + 1)
+      probe.src = src
     }
-    // Let a later zoom try again rather than staying soft for the session.
-    probe.onerror = () => hiResTriedRef.current.delete(id)
-    probe.src = bestSrc(image, DETAIL_WIDTH)
+
+    tryLoad(0)
+    return () => {
+      cancelled = true
+    }
   }, [crop?.zoom, failed, image, view.scale])
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -821,11 +836,9 @@ export function Lightbox({
   if (!image) return null
 
   const whiteBalanceStyle = whiteBalanceOverlay(adjustments)
-  // Preloaded, so this only costs the bytes once per photo.
-  const imageSrc = bestSrc(
-    image,
-    hiResId === image.id ? DETAIL_WIDTH : BASE_WIDTH,
-  )
+  // The sharp layer is preloaded, so this only costs the bytes once per photo.
+  const imageSrc =
+    hiRes?.id === image.id ? hiRes.src : bestSrc(image, BASE_WIDTH)
 
   return (
     <div

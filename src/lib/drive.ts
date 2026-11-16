@@ -175,6 +175,14 @@ export const aspectRatio = (f: DriveImage) => {
 export const bestSrc = (f: DriveImage, w: number) =>
   f.thumbnailLink?.replace(/=s\d+(-c)?$/, `=w${w}`) || fullSrc(f.id, w)
 
+/**
+ * Largest rendition Drive holds for a signed link (`=s0`). It is what the
+ * lightbox uses once zoomed, so detail is limited by the file, not by the
+ * size in the listing URL. Falls back to the public endpoint at 3200 px.
+ */
+export const largestSrc = (f: DriveImage) =>
+  f.thumbnailLink?.replace(/=s\d+(-c)?$/, '=s0') || fullSrc(f.id, 3200)
+
 /** Public files only — safe in <img>, no auth header, no CORS dance. */
 export const fullSrc = (id: string, w = 1600) =>
   `https://drive.google.com/thumbnail?id=${id}&sz=w${w}`

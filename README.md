@@ -384,7 +384,7 @@ endpoints, and both are capped:
 
 | Where | URL | Ceiling |
 | --- | --- | --- |
-| Lightbox (`bestSrc`) | signed `lh3.googleusercontent.com/…=w1600`, swapped to `=w2560` once zoomed; `drive.google.com/thumbnail?sz=wN` only when Drive gave no `thumbnailLink` | 1600 px **wide** normally, 2560 px after zoom |
+| Lightbox (`bestSrc`) | signed `lh3.googleusercontent.com/…=w1600`, swapped to `=s0` (largest) once zoomed, with a `=w3200` fallback; `drive.google.com/thumbnail?sz=wN` only when Drive gave no `thumbnailLink` | 1600 px **wide** normally, largest available after zoom |
 | Grid (`thumbSrcSet`) | `lh3.googleusercontent.com/…=s400 / =s800 / =s1600` | 1600×1600 box; browser picks per rendered width × DPR (see below) |
 
 - `sz=wN` scales the image to width `N`, preserving aspect ratio, and **never
@@ -415,12 +415,13 @@ Consequences:
   photo is delivered as 1600 px in the viewer.
 - At 5× zoom the lightbox shows interpolated pixels; that is the cap, not a bug.
 - **Dynamic detail:** when the viewer zoom × crop zoom reaches 2×, the lightbox
-  preloads the same file at `=w2560` and swaps it in only after it has loaded,
-  so opening stays on the 1600 px rendition and the sharper one costs one extra
-  download per photo per session. It is 1.6× wider than the base, never the
-  original file, and is remembered per file id while the tab is open. The swap
-  logs `[drive-gallery] lightbox detail rendition` with the rendition's real
-  `naturalWidth`, which is the quickest way to confirm Drive honoured the size.
+  tries the signed link at `=s0` (largest rendition Drive holds) and falls back
+  to `=w3200`; the winner is preloaded first and swapped in only after it has
+  loaded, so opening stays on the 1600 px rendition and the extra download
+  happens once per photo per session. The console logs
+  `[drive-gallery] lightbox detail rendition <w>x<h> from <url>` — the quickest
+  way to confirm what Drive actually served. If that log does not appear, the
+  swap did not load and the base rendition is still on screen.
 - The lightbox deliberately uses the **signed** `thumbnailLink` (rewritten to
   `=w1600` / `=w2560`) rather than `drive.google.com/thumbnail?sz=wN`: the signed
   CDN is the same host the grid already loads from, and the public thumbnail
