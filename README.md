@@ -384,7 +384,7 @@ endpoints, and both are capped:
 
 | Where | URL | Ceiling |
 | --- | --- | --- |
-| Lightbox (`fullSrc`) | `drive.google.com/thumbnail?id=…&sz=w1600` | 1600 px **wide** (a portrait can be taller) |
+| Lightbox (`bestSrc`) | signed `lh3.googleusercontent.com/…=w1600`, swapped to `=s0` (largest) once zoomed, with a `=w3200` fallback; `drive.google.com/thumbnail?sz=wN` only when Drive gave no `thumbnailLink` | 1600 px **wide** normally, largest available after zoom |
 | Grid (`thumbSrcSet`) | `lh3.googleusercontent.com/…=s400 / =s800 / =s1600` | 1600×1600 box; browser picks per rendered width × DPR (see below) |
 
 - `sz=wN` scales the image to width `N`, preserving aspect ratio, and **never
@@ -414,6 +414,20 @@ Consequences:
   folders — a 1080 px-wide set looks identical to the original, while a 6000 px
   photo is delivered as 1600 px in the viewer.
 - At 5× zoom the lightbox shows interpolated pixels; that is the cap, not a bug.
+- **Dynamic detail:** when the viewer zoom × crop zoom reaches 2×, the lightbox
+  tries the signed link at `=s0` (largest rendition Drive holds) and falls back
+  to `=w3200`; the winner is preloaded first and swapped in only after it has
+  loaded, so opening stays on the 1600 px rendition and the extra download
+  happens once per photo per session. The console logs
+  `[drive-gallery] lightbox detail rendition <w>x<h> from <url>` — the quickest
+  way to confirm what Drive actually served. If that log does not appear, the
+  swap did not load and the base rendition is still on screen.
+- The lightbox deliberately uses the **signed** `thumbnailLink` (rewritten to
+  `=w1600` / `=w2560`) rather than `drive.google.com/thumbnail?sz=wN`: the signed
+  CDN is the same host the grid already loads from, and the public thumbnail
+  endpoint can answer with a smaller render than requested. The `=sN` (box) form
+  is avoided because it caps the *long edge*, which would reduce portrait photos
+  below what `sz=wN` returned.
 - Originals would need `files.get?alt=media` with OAuth.
 
 To raise the ceiling, change the default in `src/lib/drive.ts`
@@ -452,6 +466,68 @@ Costs to keep in mind: each high-res fetch is real bandwidth, Drive can answer
 `429` under load, and RAW-only files still have no browser-decodable rendition
 at any size. Load lazily, one photo at a time, and never preload high-res for
 neighbours.
+
+### How the dynamic detail feature is built (and what went wrong getting there)
+
+The lightbox now upgrades itself after zoom. Four separate faults made earlier
+attempts look like "Drive cannot do this", and each one matters if the feature is
+changed later:
+
+1. **Wrong host.** The viewer used `drive.google.com/thumbnail?id=…&sz=w1600`
+   while the grid used the signed `lh3.googleusercontent.com/…=s800` link. The
+   public `thumbnail` endpoint can answer with a *smaller* rendition than the
+   requested `sz`, so the lightbox could genuinely look softer than the grid
+   tile it was opened from. Both paths now go through `bestSrc()` in
+   `src/lib/drive.ts`: rewrite the signed `thumbnailLink` when present, fall back
+   to the public endpoint only when there is none.
+2. **Box vs width.** `=sN` fits the image in an `N`×`N` box, capping the **long
+   edge**, whereas `sz=wN` caps the **width**. For a portrait photo `=s1600`
+   returns ~900 px wide (fewer pixels than the old URL), which looks like a
+   regression. `bestSrc()` therefore rewrites to `=wN`; only `largestSrc()` uses
+   `=s0`, where the box form is exactly what "largest available" means.
+3. **A preload cancelled by its own dependency.** The first implementation keyed
+   the preload effect on the live `view.scale`. Every wheel tick re-ran the
+   effect, its cleanup marked the request cancelled, and the next run skipped
+   because the photo was already recorded as tried. The big image downloaded and
+   was thrown away. The effect now depends on the boolean `wantDetail`
+   (`viewer zoom × crop zoom >= 2`) and keeps the loaded URL in `hiRes` state.
+4. **Swapping `src` never repainted.** Changing `src` on the existing `<img>`
+   did not visibly replace the photo in testing, even though the preload log
+   confirmed the new bytes had arrived. The sharp rendition is now a separate
+   `<img class="lightbox-detail">` painted over the base image inside the same
+   zoom/crop transform; it only mounts after the preload finishes, so there is no
+   flash and no dependence on `src` swap behaviour. A `· HQ` marker in the
+   lightbox counter confirms the layer is active.
+5. **Compositor rasterization.** `will-change: transform` on `.lightbox-image`
+   promoted the photo to a composited layer that Chrome may rasterize once at the
+   unzoomed layout size and then magnify by `transform: scale()`. That hid every
+   extra pixel the sharper rendition added. The hint was removed, letting the
+   browser re-rasterize at the zoomed size.
+
+Things that are correct but look wrong while debugging:
+
+- DevTools' **"Rendered size" never changes when zooming**. Zoom is a CSS
+  `transform`, which is paint-time only: the layout box stays the same (e.g.
+  339×509) while the compositor magnifies it. Intrinsic size is what limits
+  sharpness; rendered size is just layout.
+- A photo drawn at 339 CSS px wide is *downscaled* from a 1600 px rendition and
+  is already oversampled. Softness only appears when the magnification exceeds
+  the intrinsic pixels (roughly `rendered width × zoom × devicePixelRatio`).
+- The `HQ` marker appears only after the preload lands. If it never appears, the
+  console line `[drive-gallery] lightbox detail rendition <w>x<h> from <url>`
+  did not fire and the large image was not fetched (or not decoded).
+
+Still worth fixing later:
+
+- `largestSrc()` returns `=s0`, which for a 3712×5568 photo is ~1.9 MB on first
+  zoom. If bandwidth matters more than maximum detail, use `=w2560` as the only
+  detail candidate instead of `=s0` (one line in the preload effect).
+- The overlay is a full-size decode; on low-memory devices a large `=s0` photo
+  plus its base rendition can be heavy. Capping the detail to ~2560 px avoids it.
+- If sharpness is still insufficient at high zoom after this, the structural fix
+  is zooming by layout size (`zoom` or explicit `width`/`height`) instead of
+  `transform: scale()`, so the rendered box itself grows; that requires rewriting
+  the pan/clamp math, which is why `transform` is kept for now.
 
 ## Supported image formats
 

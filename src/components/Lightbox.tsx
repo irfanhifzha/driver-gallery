@@ -3,7 +3,7 @@ import type {
   CSSProperties,
   PointerEvent as ReactPointerEvent,
 } from 'react'
-import { fullSrc, type DriveImage } from '../lib/drive'
+import { bestSrc, largestSrc, type DriveImage } from '../lib/drive'
 import type { FavoriteMap } from '../lib/favorites'
 import {
   DEFAULT_ADJUSTMENTS,
@@ -23,6 +23,12 @@ import { metadataRows } from '../lib/metadata'
 const MIN_ZOOM = 1
 const MAX_ZOOM = 5
 const DOUBLE_CLICK_ZOOM = 2.5
+/** Default lightbox rendition width, from the same signed CDN as the grid. */
+const BASE_WIDTH = 1600
+/** Fallback width when the signed link cannot serve its largest rendition. */
+const DETAIL_WIDTH = 3200
+/** Viewer zoom (times crop zoom) that makes the base rendition look soft. */
+const DETAIL_ZOOM = 2
 const PANEL_ID = 'lightbox-adjustments'
 const INFO_PANEL_ID = 'lightbox-info'
 const SHORTCUTS_PANEL_ID = 'lightbox-shortcuts'
@@ -112,6 +118,13 @@ export function Lightbox({
 
   const [failedId, setFailedId] = useState<string | null>(null)
   const [view, setView] = useState<View>(INITIAL_VIEW)
+  /** Photo and URL of the sharper rendition, once it has loaded. */
+  const [hiRes, setHiRes] = useState<{
+    id: string
+    src: string
+    width: number
+  } | null>(null)
+  const hiResTriedRef = useRef(new Set<string>())
   const [dragging, setDragging] = useState(false)
   /** Live horizontal offset while a swipe is in progress. */
   const [swipeX, setSwipeX] = useState(0)
@@ -154,6 +167,9 @@ export function Lightbox({
   const savedCrop = savedEdit?.crop ?? null
   const displayCrop =
     crop && (cropEditing || sameCrop(crop, savedCrop)) ? crop : null
+  // Sharpness is only requested past this threshold; keeping it a boolean means
+  // the preload runs once per photo instead of on every zoom tick.
+  const wantDetail = view.scale * (crop?.zoom ?? 1) >= DETAIL_ZOOM
 
   const resetZoom = useCallback(() => {
     dragRef.current = null
@@ -504,14 +520,54 @@ export function Lightbox({
     zoomTo,
   ])
 
-  // Preload neighbours so ←/→ feels instant. Neighbours stay at thumbnail
-  // size; high-res images are only fetched for the photo being looked at.
+  // Preload neighbours so ←/→ feels instant. Neighbours stay at the base
+  // rendition; the sharper one is only fetched for the photo being looked at.
   useEffect(() => {
     for (const offset of [-1, 1]) {
       const neighbour = images[index + offset]
-      if (neighbour) new Image().src = fullSrc(neighbour.id)
+      if (neighbour) new Image().src = bestSrc(neighbour, BASE_WIDTH)
     }
   }, [images, index])
+
+  // Zooming past DETAIL_ZOOM swaps in a sharper rendition. Candidates are
+  // preloaded in order and swapped only once loaded, so the browser serves the
+  // winner from cache with no flash. This deliberately depends on the boolean
+  // `wantDetail`, not on the zoom value: depending on the value tore the
+  // preload down on every wheel tick and the swap never landed.
+  useEffect(() => {
+    if (!image || failed || !wantDetail) return
+    const id = image.id
+    if (hiResTriedRef.current.has(id)) return
+    hiResTriedRef.current.add(id)
+
+    // Drive sometimes ignores a requested width, so ask for the largest signed
+    // rendition first and only then for an explicit 3200 px one.
+    const candidates = [largestSrc(image), bestSrc(image, DETAIL_WIDTH)]
+
+    const tryLoad = (index: number) => {
+      const src = candidates[index]
+      if (!src) {
+        hiResTriedRef.current.delete(id)
+        return
+      }
+
+      const probe = new Image()
+      // The signed thumbnail CDN answers 429 when a Referer is sent.
+      probe.referrerPolicy = 'no-referrer'
+      probe.onload = () => {
+        console.info(
+          `[drive-gallery] lightbox detail rendition ${probe.naturalWidth}x${probe.naturalHeight} from ${src}`,
+        )
+        // Storing the id keeps this safe on navigation: the viewer only paints
+        // the sharp layer for the photo it is actually showing.
+        setHiRes({ id, src, width: probe.naturalWidth })
+      }
+      probe.onerror = () => tryLoad(index + 1)
+      probe.src = src
+    }
+
+    tryLoad(0)
+  }, [failed, image, wantDetail])
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return
@@ -785,6 +841,10 @@ export function Lightbox({
   if (!image) return null
 
   const whiteBalanceStyle = whiteBalanceOverlay(adjustments)
+  // The base rendition always loads; the sharp one is painted over it as a
+  // separate <img>, so no src swap is needed and a failure is invisible.
+  const imageSrc = bestSrc(image, BASE_WIDTH)
+  const detail = hiRes?.id === image.id ? hiRes : null
 
   return (
     <div
@@ -892,6 +952,7 @@ export function Lightbox({
         <span className="lightbox-count">
           {index + 1} / {images.length}
           {view.scale > MIN_ZOOM ? ` · ${view.scale.toFixed(1)}×` : ''}
+          {detail ? ' · HQ' : ''}
         </span>
         {edited ? (
           <span className="lightbox-edited" title="Has saved adjustments">
@@ -1009,33 +1070,57 @@ export function Lightbox({
                 <div
                   ref={cropRef}
                   className={`lightbox-crop${cropping ? ' is-cropping' : ''}`}
-                  style={{ '--crop-ratio': displayCrop.ratio } as CSSProperties}
+                  style={
+                    {
+                      '--crop-ratio': displayCrop.ratio,
+                      '--crop-x': displayCrop.x,
+                      '--crop-y': displayCrop.y,
+                      '--crop-zoom': displayCrop.zoom,
+                    } as CSSProperties
+                  }
                 >
                   <img
-                    src={fullSrc(image.id)}
+                    src={imageSrc}
                     alt={image.name}
                     referrerPolicy="no-referrer"
                     draggable={false}
-                    style={
-                      {
-                        '--crop-x': displayCrop.x,
-                        '--crop-y': displayCrop.y,
-                        '--crop-zoom': displayCrop.zoom,
-                      } as CSSProperties
-                    }
                     onDragStart={(event) => event.preventDefault()}
                     onError={handleImageError}
                   />
+                  {detail ? (
+                    <img
+                      className="lightbox-detail"
+                      src={detail.src}
+                      alt=""
+                      aria-hidden="true"
+                      referrerPolicy="no-referrer"
+                      draggable={false}
+                      onDragStart={(event) => event.preventDefault()}
+                    />
+                  ) : null}
                 </div>
               ) : (
-                <img
-                  src={fullSrc(image.id)}
-                  alt={image.name}
-                  referrerPolicy="no-referrer"
-                  draggable={false}
-                  onDragStart={(event) => event.preventDefault()}
-                  onError={handleImageError}
-                />
+                <>
+                  <img
+                    src={imageSrc}
+                    alt={image.name}
+                    referrerPolicy="no-referrer"
+                    draggable={false}
+                    onDragStart={(event) => event.preventDefault()}
+                    onError={handleImageError}
+                  />
+                  {detail ? (
+                    <img
+                      className="lightbox-detail"
+                      src={detail.src}
+                      alt=""
+                      aria-hidden="true"
+                      referrerPolicy="no-referrer"
+                      draggable={false}
+                      onDragStart={(event) => event.preventDefault()}
+                    />
+                  ) : null}
+                </>
               )}
               {adjustments.tintStrength > 0 ? (
                 <span
