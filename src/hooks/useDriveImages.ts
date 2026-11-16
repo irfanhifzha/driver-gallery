@@ -60,7 +60,7 @@ function shuffle<T>(items: T[]) {
   return copy
 }
 
-export function useDriveImages(folderId: string) {
+export function useDriveImages(folderId: string, apiKey: string) {
   // Read the cached listing during the first render so a repeat visit paints
   // immediately, with no extra effect round-trip. The gallery is remounted per
   // folder, so this only has to run for the folder currently being shown.
@@ -89,7 +89,12 @@ export function useDriveImages(folderId: string) {
 
       try {
         for (let page = 0; page < MAX_PAGES; page += 1) {
-          const data = await listImages(folderId, token, controller.signal)
+          const data = await listImages(
+            folderId,
+            apiKey,
+            token,
+            controller.signal,
+          )
           if (controller.signal.aborted) return
 
           collected.push(...shuffle(data.files ?? []))
@@ -114,7 +119,7 @@ export function useDriveImages(folderId: string) {
     })()
 
     return () => controller.abort()
-  }, [folderId, cached, attempt])
+  }, [folderId, apiKey, cached, attempt])
 
   useEffect(() => () => abortRef.current?.abort(), [])
 

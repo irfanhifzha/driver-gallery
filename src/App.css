@@ -132,6 +132,121 @@
   color: #a4342a;
 }
 
+.folder-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+/* Small, quiet control: the key is rarely changed, but must be changeable. */
+.folder-key {
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--accent-strong);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.folder-key:hover {
+  color: var(--accent);
+}
+
+.folder-key:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---------- API key gate ---------- */
+
+.key-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 40px 32px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 4px);
+  box-shadow: var(--shadow-sm);
+}
+
+.key-card h1 {
+  margin: 0;
+  font-size: clamp(24px, 3vw, 30px);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.key-note {
+  margin: 0;
+  max-width: 62ch;
+  font-size: 13.5px;
+}
+
+.key-note a {
+  color: var(--accent-strong);
+}
+
+.key-form {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.key-input {
+  flex: 1 1 320px;
+  min-width: 0;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--text-h);
+  padding: 10px 16px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.key-input::placeholder {
+  color: var(--text);
+  opacity: 0.85;
+}
+
+.key-input:focus {
+  outline: none;
+  background: var(--surface);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+.key-input[aria-invalid='true'] {
+  border-color: #c2544a;
+}
+
+.key-cancel {
+  font: inherit;
+  font-size: 13px;
+  padding: 9px 16px;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.key-cancel:hover {
+  color: var(--accent-strong);
+  background: var(--accent-bg);
+}
+
+.key-cancel:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* ---------- Header ---------- */
 
 .toolbar {
@@ -1576,6 +1691,10 @@
 
   .folder-form {
     gap: 8px;
+  }
+
+  .key-card {
+    padding: 28px 20px;
   }
 
   /* The full URL prefix needs its own line on a phone, with the ID below. */

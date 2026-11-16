@@ -26,10 +26,11 @@ const PER_PAGE = 24
 
 type GalleryProps = {
   folderId: string
+  apiKey: string
 }
 
-export function Gallery({ folderId }: GalleryProps) {
-  const { images, loading, error, refresh } = useDriveImages(folderId)
+export function Gallery({ folderId, apiKey }: GalleryProps) {
+  const { images, loading, error, refresh } = useDriveImages(folderId, apiKey)
   const [page, setPage] = useState(1)
   const [hideRaw, setHideRaw] = useState(true)
   const [query, setQuery] = useState('')

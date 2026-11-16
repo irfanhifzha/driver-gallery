@@ -6,9 +6,16 @@ type FolderBarProps = {
   folderId: string
   onApply: (folderId: string) => void
   onClear: () => void
+  /** Opens the API key form again, so a wrong key can be replaced. */
+  onChangeKey: () => void
 }
 
-export function FolderBar({ folderId, onApply, onClear }: FolderBarProps) {
+export function FolderBar({
+  folderId,
+  onApply,
+  onClear,
+  onChangeKey,
+}: FolderBarProps) {
   const [draft, setDraft] = useState(folderId)
   const [error, setError] = useState<string | null>(null)
 
@@ -28,9 +35,14 @@ export function FolderBar({ folderId, onApply, onClear }: FolderBarProps) {
   return (
     <section className="folder-bar" aria-label="Google Drive folder">
       <form className="folder-form" onSubmit={submit}>
-        <label className="folder-label" htmlFor="folder-id">
-          Google Drive folder
-        </label>
+        <div className="folder-head">
+          <label className="folder-label" htmlFor="folder-id">
+            Google Drive folder
+          </label>
+          <button type="button" className="folder-key" onClick={onChangeKey}>
+            Change API key
+          </button>
+        </div>
 
         <div className="folder-field">
           <span className="folder-prefix" aria-hidden="true">

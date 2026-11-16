@@ -66,11 +66,12 @@ export class DriveError extends Error {
 
 export async function listImages(
   folderId: string,
+  apiKey: string,
   pageToken?: string,
   signal?: AbortSignal,
 ) {
   const p = new URLSearchParams({
-    key: import.meta.env.VITE_GOOGLE_API_KEY,
+    key: apiKey,
     q: `'${folderId}' in parents and trashed = false and mimeType contains 'image/'`,
     fields: `nextPageToken,files(${FIELDS})`,
     pageSize: "1000",

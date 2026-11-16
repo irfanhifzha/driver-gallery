@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import './App.css'
+import { ApiKeyForm } from './components/ApiKeyForm'
 import { FolderBar } from './components/FolderBar'
 import { Gallery } from './components/Gallery'
-import { ErrorState } from './components/States'
-import { apiKey, configError } from './config'
+import { readApiKey, writeApiKey } from './config'
 import { parseFolderId } from './lib/drive'
 import { readUrlState, updateUrl } from './lib/urlState'
 
@@ -19,6 +19,11 @@ function readStoredFolder() {
 }
 
 function App() {
+  // Each visitor supplies their own API key; it is read from localStorage and
+  // can be replaced at any time through the form. There is no build default.
+  const [apiKey, setApiKey] = useState<string | null>(readApiKey)
+  const [editingKey, setEditingKey] = useState(false)
+
   // A shared link wins over the stored folder; otherwise only a folder the
   // visitor loaded before is restored. With none at all the app stays empty
   // until one is pasted, so no request is made by default.
@@ -40,10 +45,18 @@ function App() {
     )
   }, [folderId])
 
-  if (!apiKey) {
+  if (!apiKey || editingKey) {
     return (
       <div className="app">
-        <ErrorState title="Configuration needed" message={configError ?? ''} />
+        <ApiKeyForm
+          initialKey={apiKey ?? ''}
+          onSave={(key) => {
+            writeApiKey(key)
+            setApiKey(key)
+            setEditingKey(false)
+          }}
+          onCancel={apiKey ? () => setEditingKey(false) : undefined}
+        />
       </div>
     )
   }
@@ -68,10 +81,15 @@ function App() {
         folderId={folderId}
         onApply={applyFolder}
         onClear={clearFolder}
+        onChangeKey={() => setEditingKey(true)}
       />
 
       {folderId ? (
-        <Gallery key={`gallery:${folderId}`} folderId={folderId} />
+        <Gallery
+          key={`gallery:${folderId}`}
+          folderId={folderId}
+          apiKey={apiKey}
+        />
       ) : (
         <div className="state">
           <h2>Nothing here yet</h2>

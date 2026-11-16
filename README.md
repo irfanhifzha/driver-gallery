@@ -6,7 +6,7 @@ masonry grid with a keyboard-navigable lightbox and a live, preview-only photo
 editor.
 
 - No backend, no OAuth: the folder is shared "Anyone with the link", and the
-  browser uses a **referrer-restricted API key**.
+  browser uses a **referrer-restricted API key supplied by the visitor**.
 - Full design rationale, quotas, and upgrade paths live in
   [`react-vite-drive-gallery-plan.md`](./react-vite-drive-gallery-plan.md).
 - What the site actually does at runtime — API calls, cache keys, storage,
@@ -15,8 +15,8 @@ editor.
   `src/lib/drive.ts` for an `Authorization: Bearer` header (plan §10). Components
   do not need to change.
 
-Credentials live only in `.env.local`, which is git-ignored and must be created
-locally; there is no committed `.env` to fall back on.
+The API key is entered in the UI and kept only in this browser's
+`localStorage`; no key is committed or baked into the build.
 
 ## Stack
 
@@ -24,25 +24,18 @@ React 19 · TypeScript 7 · Vite 8 · oxlint. No runtime dependencies beyond Rea
 
 ## Setup
 
-Create `.env.local` in the project root (it is git-ignored via `*.local`). The
-API key is the only setting; the folder is picked in the UI, so there is no
-default folder baked into the build.
+No environment variables are needed. On first visit the app asks for a Google
+Cloud API key with the Drive API enabled and stores it in
+`localStorage["drive-gallery:api-key"]`. Because each visitor brings their own
+key, a deployment never ships one. **Change API key** in the folder bar reopens
+the form.
 
-```
-VITE_GOOGLE_API_KEY=...
-```
+Until both a key and a folder are provided, the app shows a **Nothing here yet**
+state and makes no Drive requests. The last folder you loaded is remembered in
+`localStorage["drive-gallery:folder"]`.
 
-| Variable | Meaning |
-| --- | --- |
-| `VITE_GOOGLE_API_KEY` | Google Cloud API key, restricted to the Drive API and HTTP referrers (`http://localhost:5173/*`). |
-
-Until a folder is loaded, the app shows a **Nothing here yet** state and makes
-no Drive requests. The last folder you loaded is remembered in
-`localStorage["drive-gallery:folder"]`, not in the environment.
-
-**Env loading:** Vite reads `.env.local`.
-A wrong or placeholder value here produces `400 API key not valid` straight from
-Google.
+A wrong or over-restricted key comes back from Google as `400 API key not valid`
+or `403`; key restrictions must allow the site's HTTP referrer.
 
 Handy commands:
 
@@ -127,7 +120,7 @@ no storage cost.
 
 ```
 src/
-├─ config.ts                  # apiKey (required) + configError
+├─ config.ts                  # visitor-supplied API key in localStorage
 ├─ lib/drive.ts               # the ONLY module that knows Google exists
 │                              #   + RAW/JPEG duplicate helpers
 ├─ lib/adjustments.ts         # adjustment defaults, CSS filter string, helpers
