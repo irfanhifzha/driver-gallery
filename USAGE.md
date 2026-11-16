@@ -149,7 +149,7 @@ what it stores, what it renders, and what it never does. For setup see
 | `403` on listing | Key restriction (referrer/API) or folder not shared "Anyone with the link" |
 | `429` on an image | Referrer sent to the thumbnail CDN, or an expired/limited signed URL |
 | Filename tile instead of a photo | Both thumbnail and fallback failed (unsupported format, missing thumbnail, expired URL) |
-| Nothing loads in a new tab | `429` from the CDN because the tab navigates with a referrer; reload or paste the URL fresh |
+| Nothing loads in a new tab | Usually an expired signed `thumbnailLink`; reload the gallery and retry from a fresh card |
 | Cache seems stale | 5-minute listing TTL — press **Refresh** |
 | Very large folder slow | Every page is fetched up front; the listing itself is the cost, plus JSON over the 5 MB cache budget |
 

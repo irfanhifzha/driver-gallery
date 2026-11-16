@@ -337,11 +337,10 @@ curl -s -H "Referer: http://localhost:5173/" \
   fallback behaviour.
 - Gallery `<img>` elements must keep `referrerPolicy="no-referrer"`: Drive's
   signed thumbnail CDN responds `429` to requests that send a `Referer`.
-- **Right-click → "Open image in new tab" shows a 429 page.** The new tab is a
-  navigation, so the `<img>` referrer policy is ignored and the app origin is
-  sent as `Referer`, which Google's thumbnail hosts reject. It is not the Drive
-  API quota. Reloading that tab or pasting the URL in a fresh tab works; see
-  [the debugging note](#why-open-image-in-new-tab-returns-a-429).
+- The document also sets `<meta name="referrer" content="no-referrer">`, so
+  right-click → **Open image in new tab** opens the photo instead of a `429`
+  page. `listImages` opts back into `strict-origin-when-cross-origin` so an
+  HTTP-referrer-restricted API key still sees the app origin.
 - Files added to the folder without inherited sharing silently disappear from the
   listing.
 - Public folder only; a file must be viewable by anyone with the link.
@@ -448,32 +447,36 @@ so every gallery `<img>` sets `referrerPolicy="no-referrer"`. Keep that attribut
 when adding new images; without it, a large folder shows filename tiles instead
 of photos even though the URLs work with `curl`.
 
-### Why "Open image in new tab" returns a 429
+### Image referrers and "Open image in new tab"
 
-The `429` is Google's referrer check on its thumbnail hosts
-(`lh3.googleusercontent.com`, `drive.google.com/thumbnail`), **not** this app's
-API quota — Drive API calls go to `www.googleapis.com`, images never do. The
-page it returns is an HTML "rate limit exceeded" page, not an image.
+Drive's thumbnail hosts (`lh3.googleusercontent.com`, `drive.google.com/thumbnail`)
+answer `429` when the request carries this app's `Referer`. That is why every
+gallery `<img>` sets `referrerPolicy="no-referrer"`.
 
-In-page images work because every `<img>` sets `referrerPolicy="no-referrer"`.
-Right-click → **Open image in new tab** is a top-level navigation, so the
-element's referrer policy no longer applies and the browser sends the page
-origin (`Referer: http://localhost:5173/`) with the request. Google treats that
-unknown referrer as hotlinking and answers `429` instead of the image.
+A context-menu **Open image in new tab** is a top-level navigation, so it does
+not use the `<img>` attribute. The static
+`<meta name="referrer" content="no-referrer">` in `index.html` sets the document
+policy that this navigation follows, so the new tab opens the image without a
+referrer.
 
-Measured on the same signed URL and the same Drive thumbnail URL:
+The Drive API fetch is the exception: `listImages` explicitly sets
+`referrerPolicy: 'strict-origin-when-cross-origin'`, so a key restricted by HTTP
+referrer still receives the app origin. The `<img>` elements keep their own
+no-referrer attributes as a second line of defence.
+
+If the host sends its own `Referrer-Policy` response header, set it to
+`no-referrer` too — the header takes precedence over the meta tag.
+
+Measured on the same signed URL:
 
 | Request | Result |
 | --- | --- |
-| no `Referer` (what the gallery sends) | `200`, image bytes |
-| `Referer: http://localhost:5173/` (new tab) | `429`, HTML error page |
+| no `Referer` (gallery `<img>` and new tab now) | `200`, image bytes |
+| `Referer: http://localhost:5173/` (old new-tab behaviour) | `429`, HTML error page |
 | `Referer: https://drive.google.com/` | `200`, image bytes |
 
-That last row is why **reloading** the 429 tab usually works: a reload refers to
-the image's own `google.com` URL rather than the app, which passes the check.
-Pasting the copied URL into a fresh tab (no referrer) also works. Signed
-`thumbnailLink` URLs additionally expire after a few hours, so a URL copied long
-ago can fail for that separate reason.
+Signed `thumbnailLink` URLs still expire after a few hours, so a copied URL can
+fail for that separate reason.
 
 This only affects taking a single image out of the app; the gallery itself is
 unaffected because it controls the referrer on every request it makes.

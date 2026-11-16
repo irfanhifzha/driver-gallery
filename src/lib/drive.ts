@@ -67,7 +67,12 @@ export async function listImages(
   });
   if (pageToken) p.set("pageToken", pageToken);
 
-  const res = await fetch(`${API}?${p}`, { signal });
+  const res = await fetch(`${API}?${p}`, {
+    signal,
+    // The document is no-referrer so "Open image in new tab" works; keep a
+    // referrer here in case the API key is restricted by HTTP referrer.
+    referrerPolicy: "strict-origin-when-cross-origin",
+  });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     const reason = body?.error?.errors?.[0]?.reason;
