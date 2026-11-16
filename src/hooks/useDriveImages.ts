@@ -68,66 +68,65 @@ export function useDriveImages(folderId: string) {
   const [images, setImages] = useState<DriveImage[]>(cached?.images ?? [])
   const [loading, setLoading] = useState(!cached)
   const [error, setError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
   const abortRef = useRef<AbortController | null>(null)
 
-  /**
-   * Fetch the first page, then keep requesting while the response carries a
-   * `nextPageToken`; when it comes back empty the listing is complete.
-   * Pages are appended as they arrive so images show up progressively.
-   */
-  const fetchAllPages = useCallback(async () => {
-    if (!folderId) return
+  useEffect(() => {
+    // A fresh cache is already on screen; only a cold load (attempt 0) or an
+    // explicit refresh (attempt > 0) talks to Drive.
+    if (!folderId || (cached && attempt === 0)) return
 
-    abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
 
-    const collected: DriveImage[] = []
-    let token: string | undefined
+    // Fetch the first page, then keep requesting while the response carries a
+    // `nextPageToken`; when it comes back empty the listing is complete. Pages
+    // are appended as they arrive so images show up progressively.
+    void (async () => {
+      const collected: DriveImage[] = []
+      let token: string | undefined
 
-    try {
-      for (let page = 0; page < MAX_PAGES; page += 1) {
-        const data = await listImages(folderId, token, controller.signal)
+      try {
+        for (let page = 0; page < MAX_PAGES; page += 1) {
+          const data = await listImages(folderId, token, controller.signal)
+          if (controller.signal.aborted) return
+
+          collected.push(...shuffle(data.files ?? []))
+          setImages([...collected])
+          token = data.nextPageToken
+          if (!token) break
+        }
+
+        setError(null)
+        if (!token) writeCache(folderId, collected)
+      } catch (err) {
         if (controller.signal.aborted) return
-
-        collected.push(...shuffle(data.files ?? []))
-        setImages([...collected])
-        token = data.nextPageToken
-        if (!token) break
+        console.error('[drive-gallery] Drive listing failed', err)
+        setError(
+          err instanceof DriveError
+            ? err.message
+            : 'Could not reach Google Drive. Check your connection and try again.',
+        )
+      } finally {
+        if (!controller.signal.aborted) setLoading(false)
       }
+    })()
 
-      setError(null)
-      if (!token) writeCache(folderId, collected)
-    } catch (err) {
-      if (controller.signal.aborted) return
-      console.error('[drive-gallery] Drive listing failed', err)
-      setError(
-        err instanceof DriveError
-          ? err.message
-          : 'Could not reach Google Drive. Check your connection and try again.',
-      )
-    } finally {
-      if (!controller.signal.aborted) setLoading(false)
-    }
-  }, [folderId])
-
-  useEffect(() => {
-    if (!folderId || cached) return
-
-    void fetchAllPages()
-    return () => abortRef.current?.abort()
-  }, [folderId, cached, fetchAllPages])
+    return () => controller.abort()
+  }, [folderId, cached, attempt])
 
   useEffect(() => () => abortRef.current?.abort(), [])
 
   const refresh = useCallback(() => {
     if (!folderId) return
+
     clearCache(folderId)
+    abortRef.current?.abort()
     setImages([])
     setError(null)
     setLoading(true)
-    void fetchAllPages()
-  }, [folderId, fetchAllPages])
+    setAttempt((count) => count + 1)
+  }, [folderId])
 
   return { images, loading, error, refresh }
 }
