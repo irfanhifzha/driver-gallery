@@ -1196,6 +1196,60 @@
   color: rgba(243, 244, 246, 0.55);
 }
 
+/* ---------- Keyboard shortcuts panel ---------- */
+
+.lightbox-shortcuts-toggle {
+  top: 17px;
+  right: 180px;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.shortcut-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+
+.shortcut-row {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.shortcut-row dt {
+  margin: 0;
+}
+
+.shortcut-row dd {
+  margin: 0;
+  color: #d8d2c8;
+}
+
+.shortcut-row kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  color: #f3f4f6;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
 .lightbox-close,
 .lightbox-nav {
   position: absolute;
@@ -1370,6 +1424,13 @@
 
   .lightbox-info {
     right: 118px;
+  }
+
+  .lightbox-shortcuts-toggle {
+    top: 14px;
+    right: 166px;
+    width: 28px;
+    height: 28px;
   }
 
   /* Thumb-reachable bottom corners; the image keeps the full height. */

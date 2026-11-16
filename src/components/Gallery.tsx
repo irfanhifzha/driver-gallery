@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Filters } from './Filters'
 import { ImageGrid } from './ImageGrid'
 import { Lightbox } from './Lightbox'
@@ -12,6 +12,7 @@ import {
 import { Toolbar } from './Toolbar'
 import { useDriveImages } from '../hooks/useDriveImages'
 import { fileType, withoutRawDuplicates, type DriveImage } from '../lib/drive'
+import { readUrlState, updateUrl } from '../lib/urlState'
 import {
   readFavorites,
   toggleFavorite,
@@ -38,6 +39,11 @@ export function Gallery({ folderId }: GalleryProps) {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [favorites, setFavorites] = useState<FavoriteMap>(readFavorites)
   const [openIndex, setOpenIndex] = useState<number | null>(null)
+  // A `?photo=` deep link is resolved once the listing is available; while it
+  // is pending, the URL is left alone so the parameter isn't cleared first.
+  const [pendingPhoto, setPendingPhoto] = useState<string | null>(
+    () => readUrlState().photo,
+  )
 
   const types = useMemo(() => {
     const counts = new Map<string, number>()
@@ -94,6 +100,31 @@ export function Gallery({ folderId }: GalleryProps) {
   const pageImages = sorted.slice(start, start + PER_PAGE)
   const activeIndex =
     openIndex !== null && openIndex < pageImages.length ? openIndex : null
+  const activeImage = activeIndex !== null ? pageImages[activeIndex] : undefined
+
+  // Resolve a shared `?photo=<id>` against the full sorted list, then jump to
+  // the page it lives on so the lightbox opens on the right photo.
+  useEffect(() => {
+    if (!pendingPhoto) return
+    // On a cold load, wait for the listing instead of discarding the link.
+    if (loading && images.length === 0) return
+
+    const index = sorted.findIndex((image) => image.id === pendingPhoto)
+    if (index >= 0) {
+      setPage(Math.floor(index / PER_PAGE) + 1)
+      setOpenIndex(index % PER_PAGE)
+    } else if (!error || images.length > 0) {
+      // The link no longer matches anything visible; drop the stale parameter.
+      updateUrl({ photo: null })
+    }
+    setPendingPhoto(null)
+  }, [pendingPhoto, loading, images.length, error, sorted])
+
+  // Keep `?photo=` in step with the lightbox so the address bar stays shareable.
+  useEffect(() => {
+    if (pendingPhoto !== null) return
+    updateUrl({ photo: activeImage?.id ?? null })
+  }, [pendingPhoto, activeImage?.id])
 
   const resetPaging = () => {
     setPage(1)
@@ -108,6 +139,7 @@ export function Gallery({ folderId }: GalleryProps) {
   const goToPage = (next: number) => {
     setPage(next)
     setOpenIndex(null)
+    updateUrl({ photo: null })
     window.scrollTo({ top: 0 })
   }
 

@@ -36,6 +36,17 @@ export function parseFolderId(input: string) {
   const candidate = fromUrl ? fromUrl[1] : value;
   return /^[A-Za-z0-9_-]{10,}$/.test(candidate) ? candidate : null;
 }
+
+/** Accepts a raw Drive file ID or any link containing `/file/d/<id>` or `id=<id>`. */
+export function parseFileId(input: string | null) {
+  const value = input?.trim();
+  if (!value) return null;
+  const fromPath = value.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
+  const fromQuery = value.match(/[?&]id=([A-Za-z0-9_-]+)/);
+  const candidate = fromPath?.[1] ?? fromQuery?.[1] ?? value;
+  return /^[A-Za-z0-9_-]{10,}$/.test(candidate) ? candidate : null;
+}
+
 const FIELDS =
   "id,name,mimeType,size,modifiedTime,thumbnailLink," +
   "imageMediaMetadata(width,height,rotation,time,cameraMake,cameraModel,lens," +

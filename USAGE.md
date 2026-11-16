@@ -13,20 +13,25 @@ what it stores, what it renders, and what it never does. For setup see
   per-file requests, no downloads through the API, no writes.
 - **Images** come from Google's thumbnail CDN using signed URLs, which are not
   API calls and cost no quota.
-- **State** lives in `localStorage` (chosen folder and favorites) and
-  `sessionStorage` (listing cache) plus in-memory React state. No app cookies, no service worker, no
-  analytics, no IndexedDB.
+- **State** lives in `localStorage` (chosen folder and favorites), in
+  `sessionStorage` (listing cache), and in the address-bar parameters
+  `?folder=<id>` / `?photo=<fileId>`, plus in-memory React state. No app
+  cookies, no service worker, no analytics, no IndexedDB.
 
 ## A normal visit, step by step
 
 1. **Load the page.** The host serves `index.html` and the built JS/CSS. The app
-   reads `localStorage["drive-gallery:folder"]`.
-   - Nothing stored → shows the folder bar and a "Nothing here yet" state. **No
-     Google request is made.**
-   - Stored folder → jumps straight to step 3 for that folder.
+   reads `?folder=` from the address first, then
+   `localStorage["drive-gallery:folder"]`; either way it writes the folder back
+   to both storage and the address bar.
+   - Nothing in either place → shows the folder bar and a "Nothing here yet"
+     state. **No Google request is made.**
+   - A folder is known → jumps straight to step 3 for that folder. A matching
+     `?photo=<fileId>` is opened once the listing arrives (step 8).
 2. **Paste a folder link or ID and press Load folder.** The ID is extracted,
-   saved to `localStorage`, and `Gallery` remounts for that folder. **Clear
-   folder** removes that saved key and returns to the empty state.
+   saved to `localStorage`, mirrored in `?folder=`, and `Gallery` remounts for
+   that folder. Loading another folder drops any `?photo=`. **Clear folder**
+   removes the saved key and both parameters, returning to the empty state.
 3. **Fetch the listing.** The app calls Drive `files.list` with the API key,
    `q = '<folderId>' in parents and trashed = false and mimeType contains 'image/'`,
    `pageSize=1000`, and a narrow `fields` list (name, MIME type, size, modified
@@ -50,7 +55,11 @@ what it stores, what it renders, and what it never does. For setup see
 8. **Open a photo.** The lightbox requests
    `drive.google.com/thumbnail?id=…&sz=w1600` (`fullSrc`) and preloads the two
    neighbours at the same size. Its top-left overlay links the file to
-   `drive.google.com/file/d/<id>/view` in a new tab.
+   `drive.google.com/file/d/<id>/view` in a new tab. Opening, navigating, and
+   closing the viewer writes the current photo id to `?photo=` (in place, via
+   `replaceState`). A shared `?photo=<fileId>` link is resolved against the
+   listing: the gallery jumps to the page holding that id and opens it. If the
+   id is no longer in the folder, the parameter is removed.
 9. **Zoom & swipe.** CSS `transform: translate() scale()` on the already-loaded
    bitmap, 1×–5×. Pinch zooms around the fingers; at 1× a horizontal swipe
    changes photos, while zoomed it pans. Zooming does **not** download anything
@@ -59,19 +68,24 @@ what it stores, what it renders, and what it never does. For setup see
     and tint are blend overlays inside the zoom transform. Preview only — no
     request, no upload, no saved file. Settings reset when changing photos and
     when the viewer closes.
-11. **Info.** The metadata panel is built from the listing already in memory —
+11. **Shortcuts.** Pressing `?` (or clicking the round **?** button beside
+    **Info**) opens a panel listing `←`/`→`, `+`/`-`, `0`, double-click, `?`,
+    and `Esc`. It is display-only and makes no request; `Esc` closes it before
+    any other panel or the viewer. Only one panel is open at a time.
+12. **Info.** The metadata panel is built from the listing already in memory —
     no request.
-12. **Favorite.** The heart on a card — or the Favorite pill in the lightbox
+13. **Favorite.** The heart on a card — or the Favorite pill in the lightbox
     overlay — toggles the file id in
     `localStorage["drive-gallery:favorites"]`, written as
     `{ version: 1, items: { <id>: { name, addedAt } } }`. The **Favorites**
     filter then shows only shortlisted files in the current folder. No request.
-13. **Order.** Name / Date modified / Size / Type, ascending (default) or
+14. **Order.** Name / Date modified / Size / Type, ascending (default) or
     descending — client-side sort over the filtered list, resets to page 1.
-14. **Open in Drive.** A normal link to `drive.google.com/drive/folders/<id>`;
+15. **Open in Drive.** A normal link to `drive.google.com/drive/folders/<id>`;
     the app makes no request, Google's own page handles it.
-15. **Refresh.** Clears the folder's session cache, empties the grid, and starts
-    a fresh listing call (one API call per 1000 files again).
+16. **Refresh.** Clears the folder's session cache, empties the grid, closes the
+    viewer, removes `?photo=`, and starts a fresh listing call (one API call per
+    1000 files again).
 
 ## Network calls
 
@@ -102,7 +116,9 @@ what it stores, what it renders, and what it never does. For setup see
 
 | Key | Store | Lifetime | What is in it |
 | --- | --- | --- | --- |
-| `drive-gallery:folder` | `localStorage` | Until cleared | Folder ID last loaded (wins over everything on reload) |
+| `?folder=<id>` | Address bar | Until changed | Folder currently shown; wins over the stored folder on load |
+| `?photo=<fileId>` | Address bar | Until the viewer closes | Photo open in the lightbox; resolved to its page after loading |
+| `drive-gallery:folder` | `localStorage` | Until cleared | Folder ID last loaded (restored on reload when the URL has none) |
 | `drive-gallery:favorites` | `localStorage` | Until removed | `{ version, items: { <fileId>: { name, addedAt } } }` — the shortlist |
 | `drive-gallery:listing:<folderId>` | `sessionStorage` | 5 minutes, per tab | `{ storedAt, images: [...] }` — the complete listing incl. metadata |
 
@@ -126,6 +142,8 @@ what it stores, what it renders, and what it never does. For setup see
   lone RAW files stay visible.
 - **Pagination** slices the filtered array into 24-photo pages; page changes are
   instant and scroll to top.
+- **Deep links** look up the `?photo=` id in the sorted in-memory listing to pick
+  the page and lightbox index — no extra request.
 - **Masonry** is CSS `column-count` (3 columns, 2 under 1000 px), with each card
   reserving space from `imageMediaMetadata` width/height to avoid layout jumps.
 
@@ -159,7 +177,10 @@ what it stores, what it renders, and what it never does. For setup see
 - `src/hooks/useDriveImages.ts` — cache, auto-pagination, shuffle, refresh.
 - `src/components/Gallery.tsx` — filters, RAW toggle, favorites state,
   pagination, page state.
-- `src/components/Lightbox.tsx` — viewer, zoom, adjustments, info panel.
+- `src/components/Lightbox.tsx` — viewer, zoom, adjustments, info and
+  keyboard-shortcut panels.
 - `src/lib/adjustments.ts` — filter string, Temperature/tint overlays.
 - `src/lib/favorites.ts` — favorites JSON read/write and toggle by file id.
 - `src/lib/metadata.ts` — EXIF/size formatting for the info panel.
+- `src/lib/urlState.ts` — reads `?folder=`/`?photo=` and updates the address
+  bar in place with `replaceState`; `src/lib/drive.ts` validates both ids.

@@ -18,6 +18,16 @@ const MAX_ZOOM = 5
 const DOUBLE_CLICK_ZOOM = 2.5
 const PANEL_ID = 'lightbox-adjustments'
 const INFO_PANEL_ID = 'lightbox-info'
+const SHORTCUTS_PANEL_ID = 'lightbox-shortcuts'
+
+const SHORTCUTS = [
+  { keys: '← / →', action: 'Previous / next photo' },
+  { keys: '+ / -', action: 'Zoom in / out' },
+  { keys: '0', action: 'Reset zoom to 1×' },
+  { keys: 'Double-click', action: 'Toggle 2.5× zoom' },
+  { keys: '?', action: 'Show or hide this list' },
+  { keys: 'Esc', action: 'Close this list, a panel, or the viewer' },
+]
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value))
@@ -78,6 +88,8 @@ export function Lightbox({
   const panelRef = useRef<HTMLElement>(null)
   const infoButtonRef = useRef<HTMLButtonElement>(null)
   const infoPanelRef = useRef<HTMLElement>(null)
+  const shortcutsButtonRef = useRef<HTMLButtonElement>(null)
+  const shortcutsPanelRef = useRef<HTMLElement>(null)
 
   const [failedId, setFailedId] = useState<string | null>(null)
   const [view, setView] = useState<View>(INITIAL_VIEW)
@@ -89,6 +101,7 @@ export function Lightbox({
     useState<Adjustments>(DEFAULT_ADJUSTMENTS)
   const [adjustOpen, setAdjustOpen] = useState(false)
   const [infoOpen, setInfoOpen] = useState(false)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
 
   const image = images[index]
   const failed = image ? failedId === image.id : false
@@ -131,15 +144,28 @@ export function Lightbox({
     infoButtonRef.current?.focus()
   }, [])
 
-  // The two panels share the same corner, so only one is open at a time.
+  const closeShortcuts = useCallback(() => {
+    setShortcutsOpen(false)
+    shortcutsButtonRef.current?.focus()
+  }, [])
+
+  // The panels share the same corner, so only one is open at a time.
   const openAdjust = useCallback(() => {
     setInfoOpen(false)
+    setShortcutsOpen(false)
     setAdjustOpen(true)
   }, [])
 
   const openInfo = useCallback(() => {
     setAdjustOpen(false)
+    setShortcutsOpen(false)
     setInfoOpen(true)
+  }, [])
+
+  const openShortcuts = useCallback(() => {
+    setAdjustOpen(false)
+    setInfoOpen(false)
+    setShortcutsOpen(true)
   }, [])
 
   const goPrev = useCallback(() => {
@@ -250,6 +276,11 @@ export function Lightbox({
     infoPanelRef.current?.querySelector<HTMLElement>('button')?.focus()
   }, [infoOpen])
 
+  useEffect(() => {
+    if (!shortcutsOpen) return
+    shortcutsPanelRef.current?.querySelector<HTMLElement>('button')?.focus()
+  }, [shortcutsOpen])
+
   // Keyboard navigation, zoom keys, and a simple focus trap.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -263,7 +294,17 @@ export function Lightbox({
           closeInfo()
           return
         }
+        if (shortcutsOpen) {
+          closeShortcuts()
+          return
+        }
         onClose()
+        return
+      }
+      if (event.key === '?' || (event.key === '/' && event.shiftKey)) {
+        event.preventDefault()
+        if (shortcutsOpen) closeShortcuts()
+        else openShortcuts()
         return
       }
       if (event.key === 'ArrowLeft') {
@@ -315,11 +356,14 @@ export function Lightbox({
     adjustOpen,
     closeAdjust,
     closeInfo,
+    closeShortcuts,
     goNext,
     goPrev,
     infoOpen,
     onClose,
+    openShortcuts,
     resetZoom,
+    shortcutsOpen,
     zoomTo,
   ])
 
@@ -586,6 +630,18 @@ export function Lightbox({
         Info
       </button>
 
+      <button
+        ref={shortcutsButtonRef}
+        type="button"
+        className="lightbox-adjust lightbox-shortcuts-toggle"
+        onClick={() => (shortcutsOpen ? closeShortcuts() : openShortcuts())}
+        aria-label="Keyboard shortcuts"
+        aria-expanded={shortcutsOpen}
+        aria-controls={SHORTCUTS_PANEL_ID}
+      >
+        ?
+      </button>
+
       <div className="lightbox-meta">
         <span className="lightbox-name">{image.name}</span>
         <span className="lightbox-count">
@@ -760,6 +816,40 @@ export function Lightbox({
           rows={metadataRows(image)}
           onClose={closeInfo}
         />
+      ) : null}
+
+      {shortcutsOpen ? (
+        <aside
+          id={SHORTCUTS_PANEL_ID}
+          ref={shortcutsPanelRef}
+          className="lightbox-panel shortcuts-panel"
+          aria-label="Keyboard shortcuts"
+        >
+          <div className="panel-head">
+            <h2>Keyboard shortcuts</h2>
+            <button
+              type="button"
+              className="panel-close"
+              onClick={closeShortcuts}
+              aria-label="Close keyboard shortcuts"
+            >
+              ✕
+            </button>
+          </div>
+
+          <dl className="shortcut-list">
+            {SHORTCUTS.map((shortcut) => (
+              <div className="shortcut-row" key={shortcut.keys}>
+                <dt>
+                  <kbd>{shortcut.keys}</kbd>
+                </dt>
+                <dd>{shortcut.action}</dd>
+              </div>
+            ))}
+          </dl>
+
+          <p className="info-note">Press ? at any time to close this list.</p>
+        </aside>
       ) : null}
     </div>
   )

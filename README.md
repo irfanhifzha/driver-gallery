@@ -133,6 +133,7 @@ src/
 ├─ lib/adjustments.ts         # adjustment defaults, CSS filter string, helpers
 ├─ lib/metadata.ts            # file size, EXIF time/exposure, metadata rows
 ├─ lib/favorites.ts           # id-keyed shortlist in localStorage + JSON (de)serialise
+├─ lib/urlState.ts            # read/write ?folder= and ?photo= address-bar state
 ├─ hooks/useDriveImages.ts    # fetch lifecycle, auto-pagination, full-listing cache
 ├─ components/
 │  ├─ FolderBar.tsx           # folder link/ID input + validation
@@ -141,7 +142,7 @@ src/
 │  ├─ Filters.tsx             # search + type select + sort + Favorites toggle + reset
 │  ├─ ImageGrid.tsx           # order-preserving masonry columns of cards
 │  ├─ ImageCard.tsx           # lazy <img>, shimmer skeleton, retry + onError fallback
-│  ├─ Lightbox.tsx            # full-size view, swipe/pinch zoom/pan, adjust + info, ←/→/Esc
+│  ├─ Lightbox.tsx            # full-size view, swipe/pinch zoom/pan, adjust + info + shortcuts, ←/→/Esc
 │  ├─ AdjustPanel.tsx         # brightness/contrast/saturation/tint sliders
 │  ├─ InfoPanel.tsx           # file metadata panel (EXIF, size, dimensions)
 │  ├─ Pagination.tsx          # Prev/Next + numbered pages (24 per page)
@@ -153,13 +154,15 @@ src/
 
 ### Data flow
 
-1. `App` restores the folder from `localStorage["drive-gallery:folder"]`.
-   With nothing stored it renders a **Nothing here yet** state instead of the
-   gallery, so no request is made until a folder is loaded. Only the API key is
-   mandatory; if it is missing, a "Configuration needed" state is shown and
-   nothing fetches. `Gallery` is keyed by the folder ID, so switching folders
-   remounts it and resets paging, filters, the lightbox, and the hook's cache
-   lookup.
+1. `App` takes the folder from `?folder=<id>` when the address carries one,
+   falling back to `localStorage["drive-gallery:folder"]`. Either way the folder
+   is written back to storage and to the address bar (via `replaceState`), so
+   the current view stays shareable and a reload reopens it. With neither
+   present it renders a **Nothing here yet** state instead of the gallery, so no
+   request is made until a folder is loaded. Only the API key is mandatory; if
+   it is missing, a "Configuration needed" state is shown and nothing fetches.
+   `Gallery` is keyed by the folder ID, so switching folders remounts it and
+   resets paging, filters, the lightbox, and the hook's cache lookup.
 2. `useDriveImages` looks for a fresh (<5 min) **complete** listing in
    `sessionStorage["drive-gallery:listing:<folderId>"]` during the first
    render.
@@ -193,6 +196,11 @@ src/
    and rendered by `Pagination`. Page boundaries are stable, and the lightbox
    navigates within the current page. Changing page scrolls to top; Refresh
    returns to page 1.
+8. A shared `?photo=<fileId>` is resolved once the listing is available:
+   `Gallery` finds the photo in the sorted list, jumps to the page it lives on,
+   and opens it in the lightbox. Opening, navigating, and closing the viewer
+   update the `photo` parameter in place; an id that no longer exists is
+   dropped, and changing, clearing, or refreshing the folder removes it.
 
 ### Invariants to preserve
 
@@ -240,6 +248,11 @@ src/
   report are omitted, and everything comes from the single folder listing. Info
   and Adjust share the top-right corner, so opening one closes the other, and
   Esc closes the open panel before the viewer.
+- Keyboard shortcuts: the round **?** button beside **Info** in the lightbox
+  controls, or pressing `?`, opens a panel listing `←`/`→` (previous/next), `+`/`-`
+  (zoom in/out), `0` (reset zoom), double-click (toggle 2.5×), `?` (toggle the
+  list) and `Esc` (close the list, then a panel, then the viewer). The panel
+  takes focus when opened and hands it back to the pill when closed.
 - Zoom & touch: the mouse wheel zooms 1×–5× around the cursor, dragging pans
   while zoomed, double-click (or double-tap) toggles 2.5×/1×, and `+`, `-`, `0`
   zoom in/out/reset from the keyboard. On touch screens, pinch zooms 1×–5×
@@ -251,6 +264,13 @@ src/
   folder with counts. Both combine with the RAW toggle and pagination, reset to
   page 1 on change, and show a "No photos match" state with **Clear filters**
   when nothing matches.
+- Shareable URL state: `?folder=<id>` reopens a folder even when it differs
+  from the stored one, and `?photo=<fileId>` opens the lightbox on that photo
+  once the listing loads (switching to its page if needed). Both are kept in
+  sync with `history.replaceState`, so the address bar can be copied at any
+  time without filling the Back button. **Clear folder** removes both
+  parameters, and the photo parameter is dropped when that id can no longer be
+  found in the folder.
 - Favorites: the heart on a card adds/removes that Drive file id from a
   shortlist stored in `localStorage["drive-gallery:favorites"]`; the **Favorites
   (n)** pill filters the grid to it and shows an empty state when the folder has
@@ -304,10 +324,14 @@ back to.
 - The folder must be public (**Anyone with the link → Viewer**); being shared
   with your account only is not enough for the API-key model.
 - Invalid input shows an inline error and leaves the current folder untouched.
+- The current folder is mirrored in `?folder=<id>`, and a `?photo=<fileId>`
+  parameter opens that photo. A link carrying both reopens the exact view, and
+  the parameters are removed again by **Clear folder**.
 - Listings are cached per folder for 5 minutes, so switching back to a folder
   you just viewed is instant. Filters, paging, and the lightbox reset on switch.
-- The stored folder is restored on reload; clear the `drive-gallery:folder`
-  key to start again from the empty prompt.
+- The stored folder is restored on reload when the URL has no `?folder=`. Use
+  **Clear folder** (which also clears the `drive-gallery:folder` key) to start
+  again from the empty prompt.
 - This is read-only: the app never modifies the folder or its sharing.
 
 ## Smoke-testing the Drive setup
@@ -345,7 +369,9 @@ curl -s -H "Referer: http://localhost:5173/" \
   listing.
 - Public folder only; a file must be viewable by anyone with the link.
 - The app currently has one lint warning (`react/set-state-in-effect` on the
-  mount fetch effect). It is expected for fetch-on-mount and does not fail lint.
+  `?photo=` resolution effect in `Gallery`). The target page and lightbox can
+  only be chosen after the listing arrives, so the effect is expected and does
+  not fail lint.
 
 ## Image resolution
 
@@ -504,13 +530,10 @@ the current model (public folder, API key, static site, no backend).
 
 ### Near term (small, no new services)
 
-- `?folder=<id>&photo=<fileId>` URL parameters: shareable links that reopen the
-  same folder and lightbox photo, restored on load.
 - Remembering the sort choice across reloads; random shuffle stays the default.
 - Persist adjustments per photo in `localStorage`, or export a processed image.
   Export needs canvas + CORS, and the thumbnail hosts are unlikely to allow
   `crossOrigin="anonymous"`, so it may require a same-origin proxy.
-- A `?` keyboard-shortcut overlay covering arrows, Esc, and zoom keys.
 - Optional infinite scroll alongside numbered pages (page number in the URL).
 - Tests: unit tests for filtering, RAW dedupe, and adjustment helpers; a small
   browser smoke test for folder switching and the lightbox.
