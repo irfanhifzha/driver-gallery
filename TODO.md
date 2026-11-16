@@ -12,5 +12,5 @@ Possible next steps live under "Roadmap (not implemented)" in the README.
 
 ~~- quality life on edit mode, when double click a slider option the value get to default, like temperature 0, brightness to 100% back, and so on.~~
 
-- i think the preview grid and lighbox has a little bit of differnt adjust render filter, for example when saturation and tempare high in grid i could see the different but in lightbox i couldnt, fix it 
+~~- i think the preview grid and lighbox has a little bit of differnt adjust render filter, for example when saturation and tempare high in grid i could see the different but in lightbox i couldnt, fix it~~
 

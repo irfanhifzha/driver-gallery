@@ -1122,6 +1122,13 @@ export function Lightbox({
                   ) : null}
                 </>
               )}
+              {whiteBalanceStyle ? (
+                <span
+                  className="lightbox-wb"
+                  aria-hidden="true"
+                  style={whiteBalanceStyle}
+                />
+              ) : null}
               {adjustments.tintStrength > 0 ? (
                 <span
                   className="lightbox-tint"
@@ -1130,13 +1137,6 @@ export function Lightbox({
                     background: `hsl(${adjustments.tintHue} 80% 50%)`,
                     opacity: adjustments.tintStrength / 100,
                   }}
-                />
-              ) : null}
-              {whiteBalanceStyle ? (
-                <span
-                  className="lightbox-wb"
-                  aria-hidden="true"
-                  style={whiteBalanceStyle}
                 />
               ) : null}
             </div>
