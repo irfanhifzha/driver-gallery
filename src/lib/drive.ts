@@ -164,6 +164,17 @@ export const aspectRatio = (f: DriveImage) => {
   return width && height ? width / height : undefined;
 };
 
+/**
+ * Best rendition at width `w`: the signed CDN link when Drive provided one,
+ * otherwise the public thumbnail endpoint. The signed link is the same host
+ * the grid uses and honours larger sizes more reliably than
+ * `drive.google.com/thumbnail?sz=`, which can return a smaller render.
+ * Uses the width form (`=wN`), not the `=sN` box, so portrait photos are not
+ * reduced to a shorter long edge than the old `sz=wN` URLs.
+ */
+export const bestSrc = (f: DriveImage, w: number) =>
+  f.thumbnailLink?.replace(/=s\d+(-c)?$/, `=w${w}`) || fullSrc(f.id, w)
+
 /** Public files only — safe in <img>, no auth header, no CORS dance. */
 export const fullSrc = (id: string, w = 1600) =>
   `https://drive.google.com/thumbnail?id=${id}&sz=w${w}`

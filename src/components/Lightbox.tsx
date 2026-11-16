@@ -3,7 +3,7 @@ import type {
   CSSProperties,
   PointerEvent as ReactPointerEvent,
 } from 'react'
-import { fullSrc, type DriveImage } from '../lib/drive'
+import { bestSrc, type DriveImage } from '../lib/drive'
 import type { FavoriteMap } from '../lib/favorites'
 import {
   DEFAULT_ADJUSTMENTS,
@@ -23,10 +23,10 @@ import { metadataRows } from '../lib/metadata'
 const MIN_ZOOM = 1
 const MAX_ZOOM = 5
 const DOUBLE_CLICK_ZOOM = 2.5
-/** Default lightbox rendition width, served straight from Drive. */
+/** Default lightbox rendition width, from the same signed CDN as the grid. */
 const BASE_WIDTH = 1600
-/** Sharper rendition fetched on zoom: 1.5x wider, still never the original. */
-const DETAIL_WIDTH = 2400
+/** Sharper rendition fetched on zoom: still never the original file. */
+const DETAIL_WIDTH = 2560
 /** Viewer zoom (times crop zoom) that makes the base rendition look soft. */
 const DETAIL_ZOOM = 2
 const PANEL_ID = 'lightbox-adjustments'
@@ -518,7 +518,7 @@ export function Lightbox({
   useEffect(() => {
     for (const offset of [-1, 1]) {
       const neighbour = images[index + offset]
-      if (neighbour) new Image().src = fullSrc(neighbour.id, BASE_WIDTH)
+      if (neighbour) new Image().src = bestSrc(neighbour, BASE_WIDTH)
     }
   }, [images, index])
 
@@ -535,10 +535,18 @@ export function Lightbox({
     const probe = new Image()
     // The signed thumbnail CDN answers 429 when a Referer is sent.
     probe.referrerPolicy = 'no-referrer'
-    probe.onload = () => setHiResId(id)
+    probe.onload = () => {
+      console.info('[drive-gallery] lightbox detail rendition', {
+        name: image.name,
+        width: probe.naturalWidth,
+        requested: DETAIL_WIDTH,
+        src: probe.src,
+      })
+      setHiResId(id)
+    }
     // Let a later zoom try again rather than staying soft for the session.
     probe.onerror = () => hiResTriedRef.current.delete(id)
-    probe.src = fullSrc(id, DETAIL_WIDTH)
+    probe.src = bestSrc(image, DETAIL_WIDTH)
   }, [crop?.zoom, failed, image, view.scale])
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -814,8 +822,8 @@ export function Lightbox({
 
   const whiteBalanceStyle = whiteBalanceOverlay(adjustments)
   // Preloaded, so this only costs the bytes once per photo.
-  const imageSrc = fullSrc(
-    image.id,
+  const imageSrc = bestSrc(
+    image,
     hiResId === image.id ? DETAIL_WIDTH : BASE_WIDTH,
   )
 
