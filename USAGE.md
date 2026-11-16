@@ -50,11 +50,15 @@ what it stores, what it renders, and what it never does. For setup see
    the cached array — no extra requests.
 7. **Grid images.** Each card renders `thumbnailLink` as `srcSet` candidates
    (`=s400`, `=s800`, `=s1600`) with a tuned `sizes`, `loading="lazy"`, and
-   `decoding="async"`. The browser picks a size for the column width. These are
-   Google CDN requests, not Drive API calls.
-8. **Open a photo.** The lightbox requests
-   `drive.google.com/thumbnail?id=…&sz=w1600` (`fullSrc`) and preloads the two
-   neighbours at the same size. Its top meta band links the file to
+   `decoding="async"`. The browser picks a size for the column width. A saved
+   crop is previewed in the card too: the card takes the crop's ratio and the
+   thumbnail is drawn with the crop's pan/zoom. These are Google CDN requests,
+   not Drive API calls.
+8. **Open a photo.** The lightbox requests the same signed CDN link at
+   `=w1600` (`bestSrc`, a width request, so portraits keep their pixels) and
+   preloads the two neighbours at the same size. If Drive supplied no
+   `thumbnailLink`, it falls back to
+   `drive.google.com/thumbnail?id=…&sz=w1600` (`fullSrc`). Its top meta band links the file to
    `drive.google.com/file/d/<id>/view` in a new tab, and its height is measured
    so the photo always starts below that band. Opening, navigating, and
    closing the viewer writes the current photo id to `?photo=` (in place, via
@@ -63,8 +67,17 @@ what it stores, what it renders, and what it never does. For setup see
    id is no longer in the folder, the parameter is removed.
 9. **Zoom & swipe.** CSS `transform: translate() scale()` on the already-loaded
    bitmap, 1×–5×. Pinch zooms around the fingers; at 1× a horizontal swipe
-   changes photos, while zoomed it pans. Zooming does **not** download anything
-   new.
+   changes photos, while zoomed it pans.
+   - **Dynamic detail:** when `viewer zoom × crop zoom` first reaches 2×, the
+     viewer preloads a sharper rendition (`=s0`, i.e. the largest the signed link
+     holds, with `=w3200` as fallback) and paints it as a second `<img>` layer
+     over the base photo; the `· HQ` marker in the counter shows it is active.
+     This happens once per photo per session and is remembered across
+     navigation. It is a **CDN request, not an API call** — no quota units, no
+     `files.get`, no `alt=media` download.
+   - Because the base rendition is already loaded, opening a photo never waits
+     on the sharp one, and a failed sharp fetch simply leaves the base image in
+     place.
 10. **Adjust.** Brightness/contrast/saturation are a CSS `filter`; temperature
     and tint are blend overlays inside the zoom transform. Preview only — no
     request, no upload, no saved file. Settings reset when changing photos and
@@ -94,9 +107,28 @@ what it stores, what it renders, and what it never does. For setup see
 | --- | --- | --- |
 | Your static host | Page load, CSS/JS | No (host's own logs) |
 | `www.googleapis.com/drive/v3/files` | Folder load / Refresh | **Yes** — 100 quota units per page |
-| `lh3.googleusercontent.com` | Grid thumbnails | No — signed CDN URL, no key |
-| `drive.google.com/thumbnail` | Lightbox image + neighbour preloads | No — no API key involved |
+| `lh3.googleusercontent.com` | Grid thumbnails, lightbox base (`=w1600`), zoomed detail (`=s0`), neighbour preloads | No — signed CDN URLs, no key |
+| `drive.google.com/thumbnail` | Fallback only: files with no `thumbnailLink` | No — no API key involved |
 | `drive.google.com/*` | Only if you click a Drive link | No |
+
+### Where image bytes come from
+
+No image ever comes through the Drive API. Both the grid and the viewer read
+Google's thumbnail CDN with URLs built from the listing's signed
+`thumbnailLink`:
+
+| What | URL shape | Size |
+| --- | --- | --- |
+| Grid card | signed link, `=s400 / =s800 / =s1600` `srcSet` | browser picks by column width × DPR |
+| Lightbox base | signed link, `=w1600` | 1600 px wide, immediate |
+| Lightbox detail (zoom ≥ 2×) | signed link, `=s0` | largest Drive holds (e.g. 3712×5568) |
+| Neighbour preload | signed link, `=w1600` | 1600 px wide, speculative |
+
+- `=wN` is a **width** request, `=sN` a square **box** (long edge), which is why
+  the lightbox base uses `=w` and only the "largest" request uses `=s0`.
+- The detail layer costs one extra CDN download per photo per session — about
+  1.9 MB for a 3712×5568 JPEG — and is never requested for neighbouring photos.
+- `files.get` and `alt=media` (200 quota units, original bytes) are never used.
 
 ## API quota, in practice
 
@@ -167,6 +199,8 @@ what it stores, what it renders, and what it never does. For setup see
 | `400 API key not valid` | Wrong/placeholder key in `.env.local`, or the dev server started before it existed |
 | `403` on listing | Key restriction (referrer/API) or folder not shared "Anyone with the link" |
 | `429` on an image | Referrer sent to the thumbnail CDN, or an expired/limited signed URL |
+| No `· HQ` marker on zoom | The sharp preload did not load (offline, `429`, expired signed link); the base rendition stays, which is normal at low zoom |
+| `HQ` shows but photo stays soft | Zoom is a CSS transform, so DevTools' "Rendered size" never changes; check the console's `[drive-gallery] lightbox detail rendition <w>x<h>` line for what Drive actually served |
 | Filename tile instead of a photo | Both thumbnail and fallback failed (unsupported format, missing thumbnail, expired URL) |
 | Nothing loads in a new tab | Usually an expired signed `thumbnailLink`; reload the gallery and retry from a fresh card |
 | Cache seems stale | 5-minute listing TTL — press **Refresh** |
@@ -174,7 +208,8 @@ what it stores, what it renders, and what it never does. For setup see
 
 ## Where the behaviour lives
 
-- `src/lib/drive.ts` — the API call, field list, URL builders, RAW helpers.
+- `src/lib/drive.ts` — the API call, field list, URL builders (`thumb`,
+  `thumbSrcSet`, `fullSrc`, `bestSrc`, `largestSrc`), RAW helpers.
 - `src/hooks/useDriveImages.ts` — cache, auto-pagination, shuffle, refresh.
 - `src/components/Gallery.tsx` — filters, RAW toggle, favorites state,
   pagination, page state.
