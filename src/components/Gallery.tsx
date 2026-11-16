@@ -33,6 +33,9 @@ export function Gallery({ folderId }: GalleryProps) {
   const [query, setQuery] = useState('')
   const [type, setType] = useState('all')
   const [favoritesOnly, setFavoritesOnly] = useState(false)
+  type SortKey = 'name' | 'modified' | 'size' | 'type'
+  const [sortKey, setSortKey] = useState<SortKey>('name')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [favorites, setFavorites] = useState<FavoriteMap>(readFavorites)
   const [openIndex, setOpenIndex] = useState<number | null>(null)
 
@@ -62,11 +65,33 @@ export function Gallery({ folderId }: GalleryProps) {
   const duplicateCount = filtered.length - deduped.length
   const shown = hideRaw ? deduped : filtered
 
-  const hasImages = shown.length > 0
-  const pageCount = Math.max(1, Math.ceil(shown.length / PER_PAGE))
+  const sorted = useMemo(() => {
+    const copy = [...shown]
+    const direction = sortDir === 'asc' ? 1 : -1
+    copy.sort((a, b) => {
+      let comparison = 0
+      if (sortKey === 'name') {
+        comparison = a.name.localeCompare(b.name, undefined, {
+          numeric: true,
+          sensitivity: 'base',
+        })
+      } else if (sortKey === 'modified') {
+        comparison = (a.modifiedTime ?? '').localeCompare(b.modifiedTime ?? '')
+      } else if (sortKey === 'size') {
+        comparison = Number(a.size ?? 0) - Number(b.size ?? 0)
+      } else if (sortKey === 'type') {
+        comparison = fileType(a).localeCompare(fileType(b))
+      }
+      return comparison * direction
+    })
+    return copy
+  }, [shown, sortKey, sortDir])
+
+  const hasImages = sorted.length > 0
+  const pageCount = Math.max(1, Math.ceil(sorted.length / PER_PAGE))
   const currentPage = Math.min(page, pageCount)
   const start = (currentPage - 1) * PER_PAGE
-  const pageImages = shown.slice(start, start + PER_PAGE)
+  const pageImages = sorted.slice(start, start + PER_PAGE)
   const activeIndex =
     openIndex !== null && openIndex < pageImages.length ? openIndex : null
 
@@ -101,6 +126,16 @@ export function Gallery({ folderId }: GalleryProps) {
     resetPaging()
   }
 
+  const handleSortKeyChange = (value: string) => {
+    setSortKey(value as SortKey)
+    resetPaging()
+  }
+
+  const handleSortDirChange = (value: 'asc' | 'desc') => {
+    setSortDir(value)
+    resetPaging()
+  }
+
   const handleToggleFavoritesOnly = (next: boolean) => {
     setFavoritesOnly(next)
     resetPaging()
@@ -110,6 +145,13 @@ export function Gallery({ folderId }: GalleryProps) {
     const next = toggleFavorite(favorites, image)
     setFavorites(next)
     writeFavorites(next)
+  }
+
+  const handleClearFavorites = () => {
+    setFavorites({})
+    writeFavorites({})
+    setFavoritesOnly(false)
+    resetPaging()
   }
 
   const handleResetFilters = () => {
@@ -138,9 +180,15 @@ export function Gallery({ folderId }: GalleryProps) {
             types={types}
             favoritesOnly={favoritesOnly}
             favoriteCount={favoriteCount}
+            totalFavorites={Object.keys(favorites).length}
+            sortKey={sortKey}
+            sortDir={sortDir}
             onQueryChange={handleQueryChange}
             onTypeChange={handleTypeChange}
             onToggleFavorites={handleToggleFavoritesOnly}
+            onClearFavorites={handleClearFavorites}
+            onSortKeyChange={handleSortKeyChange}
+            onSortDirChange={handleSortDirChange}
             onReset={handleResetFilters}
           />
         ) : null}
@@ -182,7 +230,7 @@ export function Gallery({ folderId }: GalleryProps) {
               <div className="pager-bar">
                 <p className="page-range">
                   Showing {start + 1}–{start + pageImages.length} of{' '}
-                  {shown.length}
+                  {sorted.length}
                 </p>
                 <Pagination
                   page={currentPage}
@@ -214,7 +262,9 @@ export function Gallery({ folderId }: GalleryProps) {
         <Lightbox
           images={pageImages}
           index={activeIndex}
+          favorites={favorites}
           onIndexChange={setOpenIndex}
+          onToggleFavorite={handleToggleFavorite}
           onClose={() => setOpenIndex(null)}
         />
       ) : null}

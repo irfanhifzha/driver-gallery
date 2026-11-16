@@ -9,9 +9,15 @@ type FiltersProps = {
   types: TypeOption[]
   favoritesOnly: boolean
   favoriteCount: number
+  totalFavorites: number
+  sortKey: string
+  sortDir: 'asc' | 'desc'
   onQueryChange: (query: string) => void
   onTypeChange: (type: string) => void
   onToggleFavorites: (favoritesOnly: boolean) => void
+  onClearFavorites: () => void
+  onSortKeyChange: (key: string) => void
+  onSortDirChange: (dir: 'asc' | 'desc') => void
   onReset: () => void
 }
 
@@ -21,9 +27,15 @@ export function Filters({
   types,
   favoritesOnly,
   favoriteCount,
+  totalFavorites,
+  sortKey,
+  sortDir,
   onQueryChange,
   onTypeChange,
   onToggleFavorites,
+  onClearFavorites,
+  onSortKeyChange,
+  onSortDirChange,
   onReset,
 }: FiltersProps) {
   const isFiltering =
@@ -107,6 +119,42 @@ export function Filters({
           />
         </svg>
         Favorites{favoriteCount > 0 ? ` (${favoriteCount})` : ''}
+      </button>
+
+      {totalFavorites > 0 ? (
+        <button
+          type="button"
+          className="favorites-clear"
+          onClick={onClearFavorites}
+        >
+          Clear favorites
+        </button>
+      ) : null}
+
+      <label className="sort-filter">
+        <span className="type-filter-label">Order</span>
+        <select
+          className="type-select"
+          value={sortKey}
+          onChange={(event) => onSortKeyChange(event.target.value)}
+          aria-label="Sort photos by"
+        >
+          <option value="name">Name</option>
+          <option value="modified">Date modified</option>
+          <option value="size">Size</option>
+          <option value="type">Type</option>
+        </select>
+      </label>
+
+      <button
+        type="button"
+        className="sort-dir"
+        aria-label={sortDir === 'asc' ? 'Sort ascending' : 'Sort descending'}
+        onClick={() =>
+          onSortDirChange(sortDir === 'asc' ? 'desc' : 'asc')
+        }
+      >
+        {sortDir === 'asc' ? '↑' : '↓'}
       </button>
 
       {isFiltering ? (

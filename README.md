@@ -138,7 +138,7 @@ src/
 │  ├─ FolderBar.tsx           # folder link/ID input + validation
 │  ├─ Gallery.tsx             # per-folder container: toolbar, filters, grid, pager
 │  ├─ Toolbar.tsx             # title, photo count, RAW toggle, refresh
-│  ├─ Filters.tsx             # search + type select + Favorites toggle + reset
+│  ├─ Filters.tsx             # search + type select + sort + Favorites toggle + reset
 │  ├─ ImageGrid.tsx           # <ul> grid of cards
 │  ├─ ImageCard.tsx           # lazy <img>, shimmer skeleton, retry + onError fallback
 │  ├─ Lightbox.tsx            # full-size view, zoom/pan, adjust + info, ←/→/Esc
@@ -221,8 +221,8 @@ src/
   button and restored on close, body scroll locked, Tab trapped, Esc closes,
   arrows navigate, neighbours preloaded, edge arrows disabled. The photo has
   square corners and fills the viewport height; the filename, position/zoom
-  factor, and an **Open in Google Drive** link sit in a small top-left overlay
-  instead of under the image. Prev/next are SVG chevrons centred in
+  factor, an **Open in Google Drive** link, and a **Favorite** toggle sit in a
+  small top-left overlay instead of under the image. Prev/next are SVG chevrons centred in
   round buttons; on phones they move to the bottom corners for thumb reach.
 - Live adjustments: **Adjust** opens a panel with brightness (50–150 %),
   contrast (50–150 %), saturation (0–200 %), temperature (−100 cooler … +100
@@ -253,6 +253,12 @@ src/
   (n)** pill filters the grid to it and shows an empty state when the folder has
   none. Entries are id-keyed JSON with `{ name, addedAt }` metadata, so they
   survive reloads, folder switches, and renames (a renamed file keeps its id).
+  The lightbox carries the same heart for the photo on screen, and **Clear
+  favorites** (shown beside the filters when anything is saved) empties the
+  shortlist globally.
+- Order: a sort select (Name, Date modified, Size, Type) plus an ↑/↓ toggle,
+  defaulting to Name ascending. Sorting is client-side over the filtered list;
+  page 1 is restored on change.
 - RAW filter: a toolbar checkbox (default on) hides RAW files (NEF, NRW, CR2,
   CR3, ARW, DNG, RAF, RW2, ORF, SRW, PEF, RWL, X3F, MOS, ERF, KDC, MRW, plus
   `image/x-*` MIME types) **only when a JPEG with the same base file name
@@ -494,8 +500,7 @@ the current model (public folder, API key, static site, no backend).
 
 - `?folder=<id>&photo=<fileId>` URL parameters: shareable links that reopen the
   same folder and lightbox photo, restored on load.
-- Sort control (file name, modified date) with the choice remembered; random
-  shuffle stays the default.
+- Remembering the sort choice across reloads; random shuffle stays the default.
 - Persist adjustments per photo in `localStorage`, or export a processed image.
   Export needs canvas + CORS, and the thumbnail hosts are unlikely to allow
   `crossOrigin="anonymous"`, so it may require a same-origin proxy.

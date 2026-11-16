@@ -58,13 +58,16 @@ what it stores, what it renders, and what it never does. For setup see
     when the viewer closes.
 11. **Info.** The metadata panel is built from the listing already in memory —
     no request.
-12. **Favorite.** The heart on a card toggles the file id in
+12. **Favorite.** The heart on a card — or the Favorite pill in the lightbox
+    overlay — toggles the file id in
     `localStorage["drive-gallery:favorites"]`, written as
     `{ version: 1, items: { <id>: { name, addedAt } } }`. The **Favorites**
     filter then shows only shortlisted files in the current folder. No request.
-13. **Open in Drive.** A normal link to `drive.google.com/drive/folders/<id>`;
+13. **Order.** Name / Date modified / Size / Type, ascending (default) or
+    descending — client-side sort over the filtered list, resets to page 1.
+14. **Open in Drive.** A normal link to `drive.google.com/drive/folders/<id>`;
     the app makes no request, Google's own page handles it.
-14. **Refresh.** Clears the folder's session cache, empties the grid, and starts
+15. **Refresh.** Clears the folder's session cache, empties the grid, and starts
     a fresh listing call (one API call per 1000 files again).
 
 ## Network calls

@@ -41,7 +41,11 @@ export function FolderBar({ folderId, onApply, onClear }: FolderBarProps) {
           spellCheck={false}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? 'folder-error' : undefined}
-          onChange={(event) => setDraft(event.target.value)}
+          onChange={(event) => {
+            const value = event.target.value
+            const parsed = parseFolderId(value)
+            setDraft(parsed ?? value)
+          }}
         />
 
         <button type="submit" className="btn">

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { fullSrc, type DriveImage } from '../lib/drive'
+import type { FavoriteMap } from '../lib/favorites'
 import {
   DEFAULT_ADJUSTMENTS,
   filterCss,
@@ -28,14 +29,18 @@ const INITIAL_VIEW: View = { scale: 1, x: 0, y: 0 }
 type LightboxProps = {
   images: DriveImage[]
   index: number
+  favorites: FavoriteMap
   onIndexChange: (index: number) => void
+  onToggleFavorite: (image: DriveImage) => void
   onClose: () => void
 }
 
 export function Lightbox({
   images,
   index,
+  favorites,
   onIndexChange,
+  onToggleFavorite,
   onClose,
 }: LightboxProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
@@ -386,14 +391,35 @@ export function Lightbox({
           {index + 1} / {images.length}
           {view.scale > MIN_ZOOM ? ` · ${view.scale.toFixed(1)}×` : ''}
         </span>
-        <a
-          className="lightbox-open"
-          href={`https://drive.google.com/file/d/${image.id}/view`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Open in Google Drive ↗
-        </a>
+        <div className="lightbox-actions">
+          <a
+            className="lightbox-open"
+            href={`https://drive.google.com/file/d/${image.id}/view`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open in Google Drive ↗
+          </a>
+          <button
+            type="button"
+            className={`lightbox-favorite${
+              favorites[image.id] ? ' is-favorite' : ''
+            }`}
+            aria-pressed={Boolean(favorites[image.id])}
+            onClick={() => onToggleFavorite(image)}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path
+                d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"
+                fill={favorites[image.id] ? 'currentColor' : 'none'}
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinejoin="round"
+              />
+            </svg>
+            {favorites[image.id] ? 'Favorited' : 'Favorite'}
+          </button>
+        </div>
       </div>
 
       <button

@@ -364,6 +364,58 @@
   outline-offset: 2px;
 }
 
+.favorites-clear {
+  font: inherit;
+  font-size: 13px;
+  padding: 9px 12px;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.favorites-clear:hover {
+  color: var(--accent-strong);
+  background: var(--accent-bg);
+}
+
+.favorites-clear:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sort-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sort-dir {
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  padding: 7px 10px;
+  color: var(--text-h);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.sort-dir:hover {
+  background: var(--accent-bg);
+}
+
+.sort-dir:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* ---------- Masonry grid ---------- */
 
 .grid {
@@ -822,9 +874,15 @@
   font-variant-numeric: tabular-nums;
 }
 
-.lightbox-open {
-  align-self: flex-start;
+.lightbox-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   margin-top: 5px;
+  pointer-events: auto;
+}
+
+.lightbox-open {
   padding: 4px 9px;
   font-size: 11px;
   color: #f3f4f6;
@@ -841,6 +899,44 @@
 }
 
 .lightbox-open:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.lightbox-favorite {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  font: inherit;
+  font-size: 11px;
+  color: #f3f4f6;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.lightbox-favorite svg {
+  width: 13px;
+  height: 13px;
+  display: block;
+}
+
+.lightbox-favorite:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.lightbox-favorite.is-favorite {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.6);
+}
+
+.lightbox-favorite:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 2px;
 }
