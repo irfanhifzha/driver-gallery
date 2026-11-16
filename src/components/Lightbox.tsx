@@ -119,7 +119,11 @@ export function Lightbox({
   const [failedId, setFailedId] = useState<string | null>(null)
   const [view, setView] = useState<View>(INITIAL_VIEW)
   /** Photo and URL of the sharper rendition, once it has loaded. */
-  const [hiRes, setHiRes] = useState<{ id: string; src: string } | null>(null)
+  const [hiRes, setHiRes] = useState<{
+    id: string
+    src: string
+    width: number
+  } | null>(null)
   const hiResTriedRef = useRef(new Set<string>())
   const [dragging, setDragging] = useState(false)
   /** Live horizontal offset while a swipe is in progress. */
@@ -554,9 +558,9 @@ export function Lightbox({
         console.info(
           `[drive-gallery] lightbox detail rendition ${probe.naturalWidth}x${probe.naturalHeight} from ${src}`,
         )
-        // Storing the id keeps this safe on navigation: the viewer only uses
-        // the sharp URL for the photo it is actually showing.
-        setHiRes({ id, src })
+        // Storing the id keeps this safe on navigation: the viewer only paints
+        // the sharp layer for the photo it is actually showing.
+        setHiRes({ id, src, width: probe.naturalWidth })
       }
       probe.onerror = () => tryLoad(index + 1)
       probe.src = src
@@ -837,9 +841,10 @@ export function Lightbox({
   if (!image) return null
 
   const whiteBalanceStyle = whiteBalanceOverlay(adjustments)
-  // The sharp layer is preloaded, so this only costs the bytes once per photo.
-  const imageSrc =
-    hiRes?.id === image.id ? hiRes.src : bestSrc(image, BASE_WIDTH)
+  // The base rendition always loads; the sharp one is painted over it as a
+  // separate <img>, so no src swap is needed and a failure is invisible.
+  const imageSrc = bestSrc(image, BASE_WIDTH)
+  const detail = hiRes?.id === image.id ? hiRes : null
 
   return (
     <div
@@ -947,6 +952,7 @@ export function Lightbox({
         <span className="lightbox-count">
           {index + 1} / {images.length}
           {view.scale > MIN_ZOOM ? ` · ${view.scale.toFixed(1)}×` : ''}
+          {detail ? ' · HQ' : ''}
         </span>
         {edited ? (
           <span className="lightbox-edited" title="Has saved adjustments">
@@ -1064,33 +1070,57 @@ export function Lightbox({
                 <div
                   ref={cropRef}
                   className={`lightbox-crop${cropping ? ' is-cropping' : ''}`}
-                  style={{ '--crop-ratio': displayCrop.ratio } as CSSProperties}
+                  style={
+                    {
+                      '--crop-ratio': displayCrop.ratio,
+                      '--crop-x': displayCrop.x,
+                      '--crop-y': displayCrop.y,
+                      '--crop-zoom': displayCrop.zoom,
+                    } as CSSProperties
+                  }
                 >
                   <img
                     src={imageSrc}
                     alt={image.name}
                     referrerPolicy="no-referrer"
                     draggable={false}
-                    style={
-                      {
-                        '--crop-x': displayCrop.x,
-                        '--crop-y': displayCrop.y,
-                        '--crop-zoom': displayCrop.zoom,
-                      } as CSSProperties
-                    }
                     onDragStart={(event) => event.preventDefault()}
                     onError={handleImageError}
                   />
+                  {detail ? (
+                    <img
+                      className="lightbox-detail"
+                      src={detail.src}
+                      alt=""
+                      aria-hidden="true"
+                      referrerPolicy="no-referrer"
+                      draggable={false}
+                      onDragStart={(event) => event.preventDefault()}
+                    />
+                  ) : null}
                 </div>
               ) : (
-                <img
-                  src={imageSrc}
-                  alt={image.name}
-                  referrerPolicy="no-referrer"
-                  draggable={false}
-                  onDragStart={(event) => event.preventDefault()}
-                  onError={handleImageError}
-                />
+                <>
+                  <img
+                    src={imageSrc}
+                    alt={image.name}
+                    referrerPolicy="no-referrer"
+                    draggable={false}
+                    onDragStart={(event) => event.preventDefault()}
+                    onError={handleImageError}
+                  />
+                  {detail ? (
+                    <img
+                      className="lightbox-detail"
+                      src={detail.src}
+                      alt=""
+                      aria-hidden="true"
+                      referrerPolicy="no-referrer"
+                      draggable={false}
+                      onDragStart={(event) => event.preventDefault()}
+                    />
+                  ) : null}
+                </>
               )}
               {adjustments.tintStrength > 0 ? (
                 <span

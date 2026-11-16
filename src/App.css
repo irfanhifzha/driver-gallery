@@ -1281,7 +1281,10 @@
   max-width: 100%;
   max-height: var(--lightbox-photo-max-height);
   cursor: zoom-in;
-  will-change: transform;
+  /* Deliberately no `will-change: transform`: it promotes the photo to a
+     composited layer that Chrome may rasterize once at the layout size and
+     then magnify by `scale()`, which hides detail from larger renditions.
+     Leaving it out lets the browser re-rasterize at the zoomed size. */
 }
 
 .lightbox-image.is-zoomed {
@@ -1301,6 +1304,16 @@ in   view mode the crop is just a preview and keeps the zoom cursor. */
 /* Partial swipes animate back to centre; active gestures must stay immediate. */
 .lightbox-image.is-settling {
   transition: transform 0.2s ease;
+}
+
+/* The sharp rendition painted over the base one, so no src swap is needed. */
+.lightbox-detail {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
 }
 
 .lightbox-image img {
@@ -1340,9 +1353,16 @@ in   view mode the crop is just a preview and keeps the zoom cursor. */
   cursor: grabbing;
 }
 
+/* Inside a crop frame the layer must still fill the frame, not add to it. */
+.lightbox-crop img.lightbox-detail {
+  position: absolute;
+  inset: 0;
+}
+
 .lightbox-crop img {
   width: 100%;
   height: 100%;
+  position: relative;
   max-width: none;
   max-height: none;
   object-fit: cover;
