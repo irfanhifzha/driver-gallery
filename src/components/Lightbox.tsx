@@ -638,10 +638,36 @@ export function Lightbox({
           type="button"
           className="lightbox-adjust"
           onClick={() => (adjustOpen ? closeAdjust() : openAdjust())}
+          aria-label="Adjust photo"
+          title="Adjust"
           aria-expanded={adjustOpen}
           aria-controls={PANEL_ID}
         >
-          Adjust
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path
+              d="M4 7h8M18 7h2M4 17h2M12 17h8"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            />
+            <circle
+              cx="15"
+              cy="7"
+              r="2.1"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+            />
+            <circle
+              cx="9"
+              cy="17"
+              r="2.1"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+            />
+          </svg>
         </button>
       )}
 
@@ -650,10 +676,29 @@ export function Lightbox({
         type="button"
         className="lightbox-adjust lightbox-info"
         onClick={() => (infoOpen ? closeInfo() : openInfo())}
+        aria-label="File information"
+        title="File info"
         aria-expanded={infoOpen}
         aria-controls={INFO_PANEL_ID}
       >
-        Info
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <circle
+            cx="12"
+            cy="12"
+            r="8.6"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+          />
+          <path
+            d="M12 11.2v5.3"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.9"
+            strokeLinecap="round"
+          />
+          <circle cx="12" cy="8" r="1.15" fill="currentColor" />
+        </svg>
       </button>
 
       <button

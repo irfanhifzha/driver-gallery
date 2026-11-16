@@ -31,19 +31,48 @@
   color: var(--accent);
 }
 
-.folder-input {
-  flex: 1 1 320px;
+/* The URL prefix is fixed chrome around the editable folder ID, so the field
+   always shows where the ID belongs. */
+.folder-field {
+  display: flex;
+  align-items: center;
+  flex: 1 1 360px;
   min-width: 0;
-  font: inherit;
-  font-size: 13.5px;
-  color: var(--text-h);
-  padding: 10px 16px;
+  padding: 0 16px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 999px;
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease;
+}
+
+.folder-field:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+.folder-field:has(.folder-input[aria-invalid='true']) {
+  border-color: #c2544a;
+}
+
+.folder-prefix {
+  flex: none;
+  font-size: 12.5px;
+  color: var(--text);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.folder-input {
+  flex: 1 1 90px;
+  min-width: 0;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--text-h);
+  padding: 10px 0 10px 2px;
+  background: transparent;
+  border: none;
 }
 
 .folder-input::placeholder {
@@ -53,25 +82,54 @@
 
 .folder-input:focus {
   outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-bg);
 }
 
-.folder-input[aria-invalid='true'] {
-  border-color: #c2544a;
+/* Scoped to beat .btn's padding, which is declared later in this file. */
+.btn.folder-load {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+}
+
+.folder-load svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+/* Outline treatment so it sits beside the filled Load button as a secondary
+   action rather than as inline body text. */
+.folder-drive {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--accent-strong);
+  background: var(--surface);
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  text-decoration: none;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.folder-drive:hover {
+  background: var(--accent-bg);
+}
+
+.folder-drive:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .folder-error {
   font-size: 13px;
   color: #a4342a;
-}
-
-.folder-drive {
-  margin-left: auto;
-}
-
-.folder-clear {
-  white-space: nowrap;
 }
 
 /* ---------- Header ---------- */
@@ -278,9 +336,14 @@
   cursor: pointer;
 }
 
-.search-clear:hover {
+.search-clear:hover:not(:disabled) {
   background: var(--accent-bg);
   color: var(--accent-strong);
+}
+
+.search-clear:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .search-clear:focus-visible {
@@ -302,12 +365,20 @@
   color: var(--text);
 }
 
+/* Native select arrows hug the edge and cannot be positioned, so draw a
+   chevron inset from the edge instead. */
 .type-select {
+  appearance: none;
+  -webkit-appearance: none;
   font: inherit;
   font-size: 13.5px;
   color: var(--text-h);
-  padding: 10px 14px;
-  background: var(--surface);
+  padding: 10px 34px 10px 14px;
+  background-color: var(--surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6' fill='none' stroke='%236b6459' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 12px 12px;
   border: 1px solid var(--border);
   border-radius: 999px;
   cursor: pointer;
@@ -318,19 +389,39 @@
   outline-offset: 2px;
 }
 
+/* Icon-only reset / clear buttons; the label lives in aria-label/title. */
 .filter-reset {
-  font: inherit;
-  font-size: 13px;
-  padding: 9px 14px;
-  color: var(--accent-strong);
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: var(--text-h);
   background: transparent;
-  border: 1px solid transparent;
+  border: 1px solid var(--border);
   border-radius: 999px;
   cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
 }
 
-.filter-reset:hover {
+.filter-reset svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.filter-reset:hover:not(:disabled) {
+  color: var(--accent-strong);
   background: var(--accent-bg);
+  border-color: var(--accent-border);
+}
+
+.filter-reset:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .filter-reset:focus-visible {
@@ -377,25 +468,128 @@
   outline-offset: 2px;
 }
 
-.favorites-clear {
-  font: inherit;
-  font-size: 13px;
-  padding: 9px 12px;
-  color: var(--text);
-  background: transparent;
+/* The favorites toggle doubles as a disclosure for the actions list below. */
+/* One outlined pill holding the filter button and its dropdown caret. */
+.favorites-menu {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  min-height: 36px;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 999px;
-  cursor: pointer;
 }
 
-.favorites-clear:hover {
+.favorites-menu .favorites-filter {
+  border: none;
+  border-radius: 999px 0 0 999px;
+  background: transparent;
+}
+
+.favorites-menu .favorites-filter:hover,
+.favorites-menu .favorites-filter.is-active {
+  background: var(--accent-bg);
+}
+
+/* Separate caret that opens the actions dropdown; it does not filter. */
+.favorites-toggle {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: auto;
+  padding: 0;
+  color: var(--text-h);
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--border);
+  border-radius: 0 999px 999px 0;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.favorites-toggle svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.favorites-toggle:hover,
+.favorites-toggle[aria-expanded='true'] {
+  color: var(--accent-strong);
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+}
+
+.favorites-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Opens beside the toggle, top-aligned with it. */
+.favorites-list {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 8px);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 210px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-md);
+}
+
+.favorites-list button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 10px;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  color: var(--text-h);
+  background: transparent;
+  border: none;
+  border-radius: 9px;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.favorites-list button svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  display: block;
+}
+
+.favorites-list button:hover:not(:disabled) {
   color: var(--accent-strong);
   background: var(--accent-bg);
 }
 
-.favorites-clear:focus-visible {
+.favorites-list button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.favorites-list button:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline-offset: -2px;
+}
+
+.favorites-error {
+  margin: 4px 2px 2px;
+  font-size: 12px;
+  color: #a4342a;
 }
 
 .sort-filter {
@@ -787,7 +981,16 @@
      height, so the photo starts below the filename/actions instead of under
      them. The values here are the pre-measurement fallbacks. */
   --lightbox-gap: 24px;
-  --lightbox-meta-bottom: 96px;
+  --lightbox-meta-bottom: 48px;
+  /* Space reserved below the photo for the prev/next arrows. Zero on wide
+     screens, where the arrows sit in the side gutters instead. */
+  --lightbox-bottom: 0px;
+  /* The photo is centred in the whole viewport on wide screens, so the space
+     above and below it stays even. Capping its height keeps it clear of the
+     top bar without pushing it down. */
+  --lightbox-photo-max-height: calc(
+    100svh - (var(--lightbox-meta-bottom) + var(--lightbox-gap)) * 2
+  );
   position: fixed;
   inset: 0;
   z-index: 50;
@@ -795,7 +998,6 @@
   align-items: center;
   justify-content: center;
   padding: var(--lightbox-gap);
-  padding-top: calc(var(--lightbox-meta-bottom) + var(--lightbox-gap));
 }
 
 .lightbox-backdrop {
@@ -824,9 +1026,7 @@
   justify-content: center;
   overflow: hidden;
   max-width: 100%;
-  max-height: calc(
-    100svh - var(--lightbox-meta-bottom) - var(--lightbox-gap) * 2
-  );
+  max-height: var(--lightbox-photo-max-height);
   background: rgba(255, 255, 255, 0.03);
   /* Let pointer events drive swipe and pinch instead of browser pan/zoom. */
   touch-action: none;
@@ -837,9 +1037,7 @@
   isolation: isolate;
   overflow: hidden;
   max-width: 100%;
-  max-height: calc(
-    100svh - var(--lightbox-meta-bottom) - var(--lightbox-gap) * 2
-  );
+  max-height: var(--lightbox-photo-max-height);
   cursor: zoom-in;
   will-change: transform;
 }
@@ -860,9 +1058,7 @@
 .lightbox-image img {
   display: block;
   max-width: 100%;
-  max-height: calc(
-    100svh - var(--lightbox-meta-bottom) - var(--lightbox-gap) * 2
-  );
+  max-height: var(--lightbox-photo-max-height);
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
@@ -883,15 +1079,18 @@
   mix-blend-mode: soft-light;
 }
 
+/* Name, count and actions share one row at the top, level with the icon
+   buttons, so the photo is not pushed down by a stacked block. */
 .lightbox-meta {
   position: absolute;
-  top: 18px;
+  top: 20px;
   left: 18px;
+  right: 190px;
   z-index: 2;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-width: min(46vw, 440px);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 12px;
   font-size: 12.5px;
   color: #f3f4f6;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
@@ -899,22 +1098,25 @@
 }
 
 .lightbox-name {
+  flex: 0 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .lightbox-count {
+  flex: 0 0 auto;
   font-size: 11.5px;
   color: #a9a49b;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .lightbox-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 5px;
   pointer-events: auto;
 }
 
@@ -1002,16 +1204,17 @@
   outline-offset: 3px;
 }
 
+/* Icon-only top bar buttons: the label lives in aria-label/title. */
 .lightbox-adjust {
   position: absolute;
   top: 14px;
   right: 58px;
   z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 36px;
   height: 36px;
-  padding: 0 12px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
+  padding: 0;
   color: #f5f2ec;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -1019,6 +1222,12 @@
   backdrop-filter: blur(8px);
   cursor: pointer;
   transition: background 0.2s ease;
+}
+
+.lightbox-adjust svg {
+  width: 17px;
+  height: 17px;
+  display: block;
 }
 
 .lightbox-adjust:hover,
@@ -1032,7 +1241,7 @@
 }
 
 .lightbox-info {
-  right: 126px;
+  right: 102px;
 }
 
 .lightbox-panel {
@@ -1159,8 +1368,13 @@
   cursor: pointer;
 }
 
-.adjust-reset:hover {
+.adjust-reset:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.18);
+}
+
+.adjust-reset:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .adjust-reset:focus-visible {
@@ -1212,7 +1426,7 @@
 
 .lightbox-shortcuts-toggle {
   top: 17px;
-  right: 180px;
+  right: 146px;
   display: inline-grid;
   place-items: center;
   width: 30px;
@@ -1302,16 +1516,16 @@
   font-size: 14px;
 }
 
-/* Centre the arrows on the photo area, which starts below the meta block. */
+/* The photo is centred in the viewport, so the arrows are too. */
 .lightbox-prev {
   left: 16px;
-  top: calc(50% + var(--lightbox-meta-bottom) / 2);
+  top: 50%;
   transform: translateY(-50%);
 }
 
 .lightbox-next {
   right: 16px;
-  top: calc(50% + var(--lightbox-meta-bottom) / 2);
+  top: 50%;
   transform: translateY(-50%);
 }
 
@@ -1352,12 +1566,34 @@
     margin-left: 0;
   }
 
+  /* No room beside the toggle on a phone, so drop the menu below it,
+     anchored to the button's right edge. */
+  .favorites-list {
+    top: calc(100% + 8px);
+    right: 0;
+    left: auto;
+  }
+
   .folder-form {
     gap: 8px;
   }
 
-  .folder-input {
+  /* The full URL prefix needs its own line on a phone, with the ID below. */
+  .folder-field {
     flex-basis: 100%;
+    flex-wrap: wrap;
+    padding: 8px 14px;
+    border-radius: 18px;
+  }
+
+  .folder-prefix {
+    flex: 1 1 100%;
+    font-size: 11.5px;
+  }
+
+  .folder-input {
+    flex: 1 1 100%;
+    padding-top: 2px;
   }
 
   .search-field {
@@ -1397,6 +1633,16 @@
   .lightbox {
     --lightbox-gap: 12px;
     --lightbox-meta-bottom: 128px;
+    /* Arrows are 44px tall, 12px off the bottom: keep the photo above them. */
+    --lightbox-bottom: calc(56px + env(safe-area-inset-bottom));
+    /* Phones keep the photo in the band between the meta block and the
+       bottom arrows, which is where the tall portrait photos go. */
+    --lightbox-photo-max-height: calc(
+      100svh - var(--lightbox-meta-bottom) - var(--lightbox-bottom) -
+        var(--lightbox-gap) * 2
+    );
+    padding-top: calc(var(--lightbox-meta-bottom) + var(--lightbox-gap));
+    padding-bottom: calc(var(--lightbox-bottom) + var(--lightbox-gap));
   }
 
   .lightbox-close {
@@ -1409,8 +1655,16 @@
 
   .lightbox-meta {
     top: 56px;
+    right: auto;
     left: 12px;
     max-width: calc(100% - 24px);
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .lightbox-actions {
+    margin-top: 5px;
   }
 
   .lightbox-panel {
@@ -1425,18 +1679,22 @@
   .lightbox-adjust {
     top: 12px;
     right: 54px;
+    width: 32px;
     height: 32px;
-    padding: 0 10px;
-    font-size: 11.5px;
+  }
+
+  .lightbox-adjust svg {
+    width: 16px;
+    height: 16px;
   }
 
   .lightbox-info {
-    right: 118px;
+    right: 92px;
   }
 
   .lightbox-shortcuts-toggle {
     top: 14px;
-    right: 166px;
+    right: 130px;
     width: 28px;
     height: 28px;
   }

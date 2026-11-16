@@ -1,5 +1,9 @@
 import type { RefObject } from 'react'
-import { filterCss, type Adjustments } from '../lib/adjustments'
+import {
+  filterCss,
+  hasAdjustments,
+  type Adjustments,
+} from '../lib/adjustments'
 
 const CONTROLS = [
   { key: 'brightness', label: 'Brightness', min: 50, max: 150, unit: '%' },
@@ -103,7 +107,12 @@ export function AdjustPanel({
         ) : null}
       </p>
 
-      <button type="button" className="adjust-reset" onClick={onReset}>
+      <button
+        type="button"
+        className="adjust-reset"
+        onClick={onReset}
+        disabled={!hasAdjustments(values)}
+      >
         Reset adjustments
       </button>
 

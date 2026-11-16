@@ -14,6 +14,7 @@ import { useDriveImages } from '../hooks/useDriveImages'
 import { fileType, withoutRawDuplicates, type DriveImage } from '../lib/drive'
 import { readUrlState, updateUrl } from '../lib/urlState'
 import {
+  favoritesToJson,
   readFavorites,
   toggleFavorite,
   writeFavorites,
@@ -186,6 +187,30 @@ export function Gallery({ folderId }: GalleryProps) {
     resetPaging()
   }
 
+  const handleExportFavorites = () => {
+    const blob = new Blob([favoritesToJson(favorites)], {
+      type: 'application/json',
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `drive-gallery-favorites-${new Date()
+      .toISOString()
+      .slice(0, 10)}.json`
+    document.body.append(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
+  const handleImportFavorites = (imported: FavoriteMap) => {
+    // Imported entries win over existing ones for the same file id.
+    const next = { ...favorites, ...imported }
+    setFavorites(next)
+    writeFavorites(next)
+    resetPaging()
+  }
+
   const handleResetFilters = () => {
     setQuery('')
     setType('all')
@@ -219,6 +244,8 @@ export function Gallery({ folderId }: GalleryProps) {
             onTypeChange={handleTypeChange}
             onToggleFavorites={handleToggleFavoritesOnly}
             onClearFavorites={handleClearFavorites}
+            onExportFavorites={handleExportFavorites}
+            onImportFavorites={handleImportFavorites}
             onSortKeyChange={handleSortKeyChange}
             onSortDirChange={handleSortDirChange}
             onReset={handleResetFilters}
