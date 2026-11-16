@@ -778,7 +778,11 @@
   outline-offset: 3px;
 }
 
-.adjust-panel {
+.lightbox-info {
+  right: 158px;
+}
+
+.lightbox-panel {
   position: absolute;
   top: 78px;
   right: 18px;
@@ -798,14 +802,14 @@
   backdrop-filter: blur(16px);
 }
 
-.adjust-head {
+.panel-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
-.adjust-head h2 {
+.panel-head h2 {
   margin: 0;
   font-family: var(--sans);
   font-size: 14px;
@@ -813,7 +817,7 @@
   letter-spacing: 0.02em;
 }
 
-.adjust-close {
+.panel-close {
   display: grid;
   place-items: center;
   width: 28px;
@@ -828,11 +832,11 @@
   cursor: pointer;
 }
 
-.adjust-close:hover {
+.panel-close:hover {
   background: rgba(255, 255, 255, 0.18);
 }
 
-.adjust-close:focus-visible {
+.panel-close:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 2px;
 }
@@ -912,6 +916,41 @@
 }
 
 .adjust-note {
+  font-size: 11.5px;
+  color: rgba(243, 244, 246, 0.55);
+}
+
+/* ---------- File info panel ---------- */
+
+.info-panel {
+  width: 312px;
+}
+
+.info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 0;
+}
+
+.info-row {
+  display: grid;
+  grid-template-columns: 88px 1fr;
+  gap: 10px;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.info-row dt {
+  color: #a9a49b;
+}
+
+.info-row dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.info-note {
   font-size: 11.5px;
   color: rgba(243, 244, 246, 0.55);
 }
@@ -1032,7 +1071,7 @@
     max-height: calc(100svh - 130px);
   }
 
-  .adjust-panel {
+  .lightbox-panel {
     top: auto;
     right: 12px;
     bottom: 12px;
@@ -1045,6 +1084,10 @@
     right: 70px;
     height: 40px;
     padding: 0 14px;
+  }
+
+  .lightbox-info {
+    right: 146px;
   }
 
   .lightbox-nav {

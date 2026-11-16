@@ -4,15 +4,10 @@ import { parseFolderId } from '../lib/drive'
 
 type FolderBarProps = {
   folderId: string
-  defaultFolderId: string | null
   onApply: (folderId: string) => void
 }
 
-export function FolderBar({
-  folderId,
-  defaultFolderId,
-  onApply,
-}: FolderBarProps) {
+export function FolderBar({ folderId, onApply }: FolderBarProps) {
   const [draft, setDraft] = useState(folderId)
   const [error, setError] = useState<string | null>(null)
 
@@ -28,12 +23,6 @@ export function FolderBar({
     onApply(parsed)
   }
 
-  const useDefault = () => {
-    if (!defaultFolderId) return
-    setError(null)
-    setDraft(defaultFolderId)
-    onApply(defaultFolderId)
-  }
 
   return (
     <section className="folder-bar" aria-label="Drive folder">
@@ -58,11 +47,6 @@ export function FolderBar({
           Load folder
         </button>
 
-        {defaultFolderId && folderId !== defaultFolderId ? (
-          <button type="button" className="filter-reset" onClick={useDefault}>
-            Use default
-          </button>
-        ) : null}
       </form>
 
       {error ? (

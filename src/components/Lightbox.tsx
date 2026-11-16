@@ -8,11 +8,14 @@ import {
   type Adjustments,
 } from '../lib/adjustments'
 import { AdjustPanel } from './AdjustPanel'
+import { InfoPanel } from './InfoPanel'
+import { metadataRows } from '../lib/metadata'
 
 const MIN_ZOOM = 1
 const MAX_ZOOM = 5
 const DOUBLE_CLICK_ZOOM = 2.5
 const PANEL_ID = 'lightbox-adjustments'
+const INFO_PANEL_ID = 'lightbox-info'
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value))
@@ -47,6 +50,8 @@ export function Lightbox({
 
   const adjustButtonRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLElement>(null)
+  const infoButtonRef = useRef<HTMLButtonElement>(null)
+  const infoPanelRef = useRef<HTMLElement>(null)
 
   const [failedId, setFailedId] = useState<string | null>(null)
   const [view, setView] = useState<View>(INITIAL_VIEW)
@@ -54,6 +59,7 @@ export function Lightbox({
   const [adjustments, setAdjustments] =
     useState<Adjustments>(DEFAULT_ADJUSTMENTS)
   const [adjustOpen, setAdjustOpen] = useState(false)
+  const [infoOpen, setInfoOpen] = useState(false)
 
   const image = images[index]
   const failed = image ? failedId === image.id : false
@@ -77,6 +83,22 @@ export function Lightbox({
   const closeAdjust = useCallback(() => {
     setAdjustOpen(false)
     adjustButtonRef.current?.focus()
+  }, [])
+
+  const closeInfo = useCallback(() => {
+    setInfoOpen(false)
+    infoButtonRef.current?.focus()
+  }, [])
+
+  // The two panels share the same corner, so only one is open at a time.
+  const openAdjust = useCallback(() => {
+    setInfoOpen(false)
+    setAdjustOpen(true)
+  }, [])
+
+  const openInfo = useCallback(() => {
+    setAdjustOpen(false)
+    setInfoOpen(true)
   }, [])
 
   const goPrev = useCallback(() => {
@@ -172,13 +194,18 @@ export function Lightbox({
     return () => media.removeEventListener('wheel', onWheel)
   }, [failed, zoomTo])
 
-  // Move focus into the panel when it opens.
+  // Move focus into whichever panel just opened.
   useEffect(() => {
     if (!adjustOpen) return
     panelRef.current
       ?.querySelector<HTMLInputElement>('input[type="range"]')
       ?.focus()
   }, [adjustOpen])
+
+  useEffect(() => {
+    if (!infoOpen) return
+    infoPanelRef.current?.querySelector<HTMLElement>('button')?.focus()
+  }, [infoOpen])
 
   // Keyboard navigation, zoom keys, and a simple focus trap.
   useEffect(() => {
@@ -187,6 +214,10 @@ export function Lightbox({
         event.preventDefault()
         if (adjustOpen) {
           closeAdjust()
+          return
+        }
+        if (infoOpen) {
+          closeInfo()
           return
         }
         onClose()
@@ -237,7 +268,17 @@ export function Lightbox({
 
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [adjustOpen, closeAdjust, goPrev, goNext, onClose, resetZoom, zoomTo])
+  }, [
+    adjustOpen,
+    closeAdjust,
+    closeInfo,
+    goNext,
+    goPrev,
+    infoOpen,
+    onClose,
+    resetZoom,
+    zoomTo,
+  ])
 
   // Preload neighbours so ←/→ feels instant.
   useEffect(() => {
@@ -316,13 +357,24 @@ export function Lightbox({
           ref={adjustButtonRef}
           type="button"
           className="lightbox-adjust"
-          onClick={() => (adjustOpen ? closeAdjust() : setAdjustOpen(true))}
+          onClick={() => (adjustOpen ? closeAdjust() : openAdjust())}
           aria-expanded={adjustOpen}
           aria-controls={PANEL_ID}
         >
           Adjust
         </button>
       )}
+
+      <button
+        ref={infoButtonRef}
+        type="button"
+        className="lightbox-adjust lightbox-info"
+        onClick={() => (infoOpen ? closeInfo() : openInfo())}
+        aria-expanded={infoOpen}
+        aria-controls={INFO_PANEL_ID}
+      >
+        Info
+      </button>
 
       <button
         type="button"
@@ -437,6 +489,15 @@ export function Lightbox({
           onChange={updateAdjustments}
           onReset={resetAdjustments}
           onClose={closeAdjust}
+        />
+      ) : null}
+
+      {infoOpen && image ? (
+        <InfoPanel
+          id={INFO_PANEL_ID}
+          panelRef={infoPanelRef}
+          rows={metadataRows(image)}
+          onClose={closeInfo}
         />
       ) : null}
     </div>

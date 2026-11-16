@@ -5,7 +5,8 @@ import { DriveError, listImages, type DriveImage } from '../lib/drive'
 const CACHE_TTL_MS = 5 * 60 * 1000
 /** Safety net: 50 pages × pageSize 1000 is far beyond any real folder. */
 const MAX_PAGES = 50
-const cacheKey = (folderId: string) => `drive-gallery:${folderId}`
+// Versioned so listings cached by older builds (without EXIF metadata) are ignored.
+const cacheKey = (folderId: string) => `drive-gallery:listing:${folderId}`
 
 type CachedListing = {
   storedAt: number

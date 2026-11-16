@@ -30,14 +30,14 @@ export function AdjustPanel({
     <aside
       id={id}
       ref={panelRef}
-      className="adjust-panel"
+      className="lightbox-panel"
       aria-label="Photo adjustments"
     >
-      <div className="adjust-head">
+      <div className="panel-head">
         <h2>Adjust</h2>
         <button
           type="button"
-          className="adjust-close"
+          className="panel-close"
           onClick={onClose}
           aria-label="Close adjustments"
         >

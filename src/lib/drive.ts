@@ -1,3 +1,20 @@
+export type ImageMetadata = {
+  width?: number;
+  height?: number;
+  rotation?: number;
+  /** EXIF capture time, formatted as "YYYY:MM:DD HH:MM:SS". */
+  time?: string;
+  cameraMake?: string;
+  cameraModel?: string;
+  lens?: string;
+  exposureTime?: number;
+  aperture?: number;
+  isoSpeed?: number;
+  focalLength?: number;
+  flashUsed?: boolean;
+  location?: { latitude?: number; longitude?: number };
+};
+
 export type DriveImage = {
   id: string;
   name: string;
@@ -5,8 +22,8 @@ export type DriveImage = {
   size?: string;
   modifiedTime: string;
   thumbnailLink?: string;
-  /** Present for images; lets cards reserve space before the file loads. */
-  imageMediaMetadata?: { width?: number; height?: number };
+  /** Present for images; drives layout and the file info panel. */
+  imageMediaMetadata?: ImageMetadata;
 };
 
 const API = "https://www.googleapis.com/drive/v3/files";
@@ -20,7 +37,9 @@ export function parseFolderId(input: string) {
   return /^[A-Za-z0-9_-]{10,}$/.test(candidate) ? candidate : null;
 }
 const FIELDS =
-  "id,name,mimeType,size,modifiedTime,thumbnailLink,imageMediaMetadata(width,height)";
+  "id,name,mimeType,size,modifiedTime,thumbnailLink," +
+  "imageMediaMetadata(width,height,rotation,time,cameraMake,cameraModel,lens," +
+  "exposureTime,aperture,isoSpeed,focalLength,flashUsed,location(latitude,longitude))";
 
 export class DriveError extends Error {
   readonly status: number;

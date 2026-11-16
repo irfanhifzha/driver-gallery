@@ -3,7 +3,7 @@ import './App.css'
 import { FolderBar } from './components/FolderBar'
 import { Gallery } from './components/Gallery'
 import { ErrorState } from './components/States'
-import { apiKey, configError, defaultFolderId } from './config'
+import { apiKey, configError } from './config'
 import { parseFolderId } from './lib/drive'
 
 const STORAGE_KEY = 'drive-gallery:folder'
@@ -18,12 +18,9 @@ function readStoredFolder() {
 }
 
 function App() {
-  const [folderId, setFolderId] = useState(
-    () =>
-      readStoredFolder() ??
-      (defaultFolderId ? parseFolderId(defaultFolderId) : null) ??
-      '',
-  )
+  // Only a folder the visitor loaded before is restored; with none stored the
+  // app stays empty until one is pasted, so no request is made by default.
+  const [folderId, setFolderId] = useState(() => readStoredFolder() ?? '')
 
   if (!apiKey) {
     return (
@@ -44,15 +41,12 @@ function App() {
 
   return (
     <div className="app">
-      <FolderBar
-        key={folderId}
-        folderId={folderId}
-        defaultFolderId={defaultFolderId}
-        onApply={applyFolder}
-      />
+      {/* Both siblings remount when the folder changes, so the keys are
+          namespaced to stay unique among siblings. */}
+      <FolderBar key={`bar:${folderId}`} folderId={folderId} onApply={applyFolder} />
 
       {folderId ? (
-        <Gallery key={folderId} folderId={folderId} />
+        <Gallery key={`gallery:${folderId}`} folderId={folderId} />
       ) : (
         <div className="state">
           <h2>Pick a folder</h2>
