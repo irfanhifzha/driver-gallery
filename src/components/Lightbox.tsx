@@ -391,6 +391,14 @@ export function Lightbox({
             Scroll to zoom · drag to pan · double-click to reset
           </span>
         )}
+        <a
+          className="lightbox-open"
+          href={`https://drive.google.com/file/d/${image.id}/view`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open in Google Drive ↗
+        </a>
       </div>
 
       <button

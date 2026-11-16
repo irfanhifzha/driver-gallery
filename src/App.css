@@ -70,6 +70,10 @@
   margin-left: auto;
 }
 
+.folder-clear {
+  white-space: nowrap;
+}
+
 /* ---------- Header ---------- */
 
 .toolbar {
@@ -735,6 +739,29 @@
   font-size: 11.5px;
   letter-spacing: 0.04em;
   color: rgba(243, 244, 246, 0.55);
+}
+
+.lightbox-open {
+  align-self: flex-start;
+  margin-top: 5px;
+  padding: 5px 11px;
+  font-size: 11.5px;
+  color: #f3f4f6;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  text-decoration: none;
+  pointer-events: auto;
+  transition: background 0.2s ease;
+}
+
+.lightbox-open:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.lightbox-open:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
 }
 
 .lightbox-fallback {

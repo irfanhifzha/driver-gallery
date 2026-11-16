@@ -36,8 +36,8 @@ VITE_GOOGLE_API_KEY=...
 | --- | --- |
 | `VITE_GOOGLE_API_KEY` | Google Cloud API key, restricted to the Drive API and HTTP referrers (`http://localhost:5173/*`). |
 
-Until a folder is loaded, the app shows a **Pick a folder** prompt and makes no
-Drive requests. The last folder you loaded is remembered in
+Until a folder is loaded, the app shows a **Nothing here yet** state and makes
+no Drive requests. The last folder you loaded is remembered in
 `localStorage["drive-gallery:folder"]`, not in the environment.
 
 **Env loading:** Vite reads `.env.local`.
@@ -153,7 +153,7 @@ src/
 ### Data flow
 
 1. `App` restores the folder from `localStorage["drive-gallery:folder"]`.
-   With nothing stored it renders a **Pick a folder** prompt instead of the
+   With nothing stored it renders a **Nothing here yet** state instead of the
    gallery, so no request is made until a folder is loaded. Only the API key is
    mandatory; if it is missing, a "Configuration needed" state is shown and
    nothing fetches. `Gallery` is keyed by the folder ID, so switching folders
@@ -219,12 +219,13 @@ src/
   button and restored on close, body scroll locked, Tab trapped, Esc closes,
   arrows navigate, neighbours preloaded, edge arrows disabled. The photo has
   square corners and fills the viewport height; the filename, position, zoom
-  factor, and control hint sit in a top-left overlay instead of under the image.
+  factor, control hint, and an **Open in Google Drive** link sit in a top-left
+  overlay instead of under the image.
 - Live adjustments: **Adjust** opens a panel with brightness (50–150 %),
-  contrast (50–150 %), saturation (0–200 %), white balance (−100 cooler … +100
+  contrast (50–150 %), saturation (0–200 %), temperature (−100 cooler … +100
   warmer), tint hue (0–360°) and tint strength (0–100 %) sliders. Changes render
   instantly: a `filter` chain on the image, a `mix-blend-mode: soft-light`
-  overlay for white balance, and a `mix-blend-mode: color` overlay for tint, all
+  overlay for temperature, and a `mix-blend-mode: color` overlay for tint, all
   inside the zoom transform so they follow pan/zoom. The panel shows the live values and generated
   `filter: …` string, with Reset, and is preview-only — nothing is saved,
   exported, or written to Drive. Esc closes the panel before the viewer, and
@@ -279,7 +280,9 @@ link containing `/folders/<id>` (e.g.
 `https://drive.google.com/drive/folders/1AbC...`). **Load folder** validates it,
 stores it in `localStorage["drive-gallery:folder"]`, and remounts the gallery for
 that folder. **Open in Drive ↗** next to the form opens the current folder in
-Google Drive. There is no env-configured default folder to fall back to.
+Google Drive, and **Clear folder** removes the saved folder (and returns to the
+"Nothing here yet" state). There is no env-configured default folder to fall
+back to.
 
 - The folder must be public (**Anyone with the link → Viewer**); being shared
   with your account only is not enough for the API-key model.
@@ -336,12 +339,19 @@ endpoints, and both are capped:
 | Where | URL | Ceiling |
 | --- | --- | --- |
 | Lightbox (`fullSrc`) | `drive.google.com/thumbnail?id=…&sz=w1600` | 1600 px **wide** (a portrait can be taller) |
-| Grid (`thumbSrcSet`) | `lh3.googleusercontent.com/…=s400 / =s800 / =s1600` | 1600×1600 box; the browser usually picks 400 or 800 |
+| Grid (`thumbSrcSet`) | `lh3.googleusercontent.com/…=s400 / =s800 / =s1600` | 1600×1600 box; browser picks per rendered width × DPR (see below) |
 
 - `sz=wN` scales the image to width `N`, preserving aspect ratio, and **never
   upscales** — a file narrower than `N` comes back at its native size.
 - `=sN` fits the image inside an `N`×`N` box, so `=s1600` is 1600 px on the
   long edge (a 1080×1920 portrait becomes 900×1600).
+- **How the grid picks a candidate:** cards declare
+  `sizes="(max-width: 1000px) 46vw, 31vw"`, so the browser computes the slot
+  width from the layout and multiplies by the device pixel ratio, then takes the
+  smallest candidate that covers it. On a 1280 px desktop the column is ~397 CSS
+  px, so it picks **400** at 1× and **800** on a 2× screen; a phone in 2-column
+  mode picks 400 at 2×. **1600** is only chosen when the slot × DPR exceeds
+  800 px, e.g. a very wide window on a high-DPR display.
 
 Measured on a folder of 1080×1920 PNGs:
 

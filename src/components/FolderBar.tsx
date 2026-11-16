@@ -5,9 +5,10 @@ import { parseFolderId } from '../lib/drive'
 type FolderBarProps = {
   folderId: string
   onApply: (folderId: string) => void
+  onClear: () => void
 }
 
-export function FolderBar({ folderId, onApply }: FolderBarProps) {
+export function FolderBar({ folderId, onApply, onClear }: FolderBarProps) {
   const [draft, setDraft] = useState(folderId)
   const [error, setError] = useState<string | null>(null)
 
@@ -46,6 +47,20 @@ export function FolderBar({ folderId, onApply }: FolderBarProps) {
         <button type="submit" className="btn">
           Load folder
         </button>
+
+        {folderId ? (
+          <button
+            type="button"
+            className="filter-reset folder-clear"
+            onClick={() => {
+              setError(null)
+              setDraft('')
+              onClear()
+            }}
+          >
+            Clear folder
+          </button>
+        ) : null}
 
         {folderId ? (
           <a

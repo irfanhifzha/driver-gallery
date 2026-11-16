@@ -21,11 +21,12 @@ what it stores, what it renders, and what it never does. For setup see
 
 1. **Load the page.** The host serves `index.html` and the built JS/CSS. The app
    reads `localStorage["drive-gallery:folder"]`.
-   - Nothing stored → shows the folder bar and a "Pick a folder" prompt. **No
+   - Nothing stored → shows the folder bar and a "Nothing here yet" state. **No
      Google request is made.**
    - Stored folder → jumps straight to step 3 for that folder.
 2. **Paste a folder link or ID and press Load folder.** The ID is extracted,
-   saved to `localStorage`, and `Gallery` remounts for that folder.
+   saved to `localStorage`, and `Gallery` remounts for that folder. **Clear
+   folder** removes that saved key and returns to the empty state.
 3. **Fetch the listing.** The app calls Drive `files.list` with the API key,
    `q = '<folderId>' in parents and trashed = false and mimeType contains 'image/'`,
    `pageSize=1000`, and a narrow `fields` list (name, MIME type, size, modified
@@ -47,10 +48,11 @@ what it stores, what it renders, and what it never does. For setup see
    Google CDN requests, not Drive API calls.
 8. **Open a photo.** The lightbox requests
    `drive.google.com/thumbnail?id=…&sz=w1600` (`fullSrc`) and preloads the two
-   neighbours at the same size.
+   neighbours at the same size. Its top-left overlay links the file to
+   `drive.google.com/file/d/<id>/view` in a new tab.
 9. **Zoom.** CSS `transform: translate() scale()` on the already-loaded bitmap,
    1×–5×. Zooming does **not** download anything new.
-10. **Adjust.** Brightness/contrast/saturation are a CSS `filter`; white balance
+10. **Adjust.** Brightness/contrast/saturation are a CSS `filter`; temperature
     and tint are blend overlays inside the zoom transform. Preview only — no
     request, no upload, no saved file. Settings reset when changing photos and
     when the viewer closes.
@@ -97,7 +99,8 @@ what it stores, what it renders, and what it never does. For setup see
   exceed that; `writeCache` then fails silently and the next reload refetches.
 - Only complete listings are cached (a leftover `nextPageToken` makes
   `readCache` reject the entry).
-- Clearing `drive-gallery:folder` returns the app to the "Pick a folder" prompt.
+- Clearing `drive-gallery:folder` — or pressing **Clear folder** — returns the
+  app to the "Nothing here yet" state.
 - The app sets no cookies, uses no `localStorage` beyond the folder key, and
   registers no service worker, so there is no offline mode.
 
@@ -143,5 +146,5 @@ what it stores, what it renders, and what it never does. For setup see
 - `src/hooks/useDriveImages.ts` — cache, auto-pagination, shuffle, refresh.
 - `src/components/Gallery.tsx` — filters, RAW toggle, pagination, page state.
 - `src/components/Lightbox.tsx` — viewer, zoom, adjustments, info panel.
-- `src/lib/adjustments.ts` — filter string, white balance/tint overlays.
+- `src/lib/adjustments.ts` — filter string, Temperature/tint overlays.
 - `src/lib/metadata.ts` — EXIF/size formatting for the info panel.

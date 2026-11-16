@@ -5,7 +5,7 @@ const CONTROLS = [
   { key: 'brightness', label: 'Brightness', min: 50, max: 150, unit: '%' },
   { key: 'contrast', label: 'Contrast', min: 50, max: 150, unit: '%' },
   { key: 'saturation', label: 'Saturation', min: 0, max: 200, unit: '%' },
-  { key: 'whiteBalance', label: 'White balance', min: -100, max: 100, unit: '' },
+  { key: 'temperature', label: 'Temperature', min: -100, max: 100, unit: '' },
   { key: 'tintHue', label: 'Tint hue', min: 0, max: 360, unit: '°' },
   { key: 'tintStrength', label: 'Tint strength', min: 0, max: 100, unit: '%' },
 ] as const
@@ -57,7 +57,7 @@ export function AdjustPanel({
               >
                 <span>{control.label}</span>
                 <span className="adjust-value">
-                  {control.key === 'whiteBalance' && value > 0
+                  {control.key === 'temperature' && value > 0
                     ? `+${value}`
                     : value}
                   {control.unit}
@@ -71,7 +71,7 @@ export function AdjustPanel({
                 step={1}
                 value={value}
                 aria-valuetext={
-                  control.key === 'whiteBalance'
+                  control.key === 'temperature'
                     ? `${value} ${
                         value === 0 ? 'neutral' : value > 0 ? 'warmer' : 'cooler'
                       }`
@@ -90,10 +90,10 @@ export function AdjustPanel({
 
       <p className="adjust-code">
         <span>filter: {filterCss(values)}</span>
-        {values.whiteBalance !== 0 ? (
+        {values.temperature !== 0 ? (
           <span>
-            white balance: {values.whiteBalance > 0 ? '+' : ''}
-            {values.whiteBalance} ({values.whiteBalance > 0 ? 'warmer' : 'cooler'})
+            temperature: {values.temperature > 0 ? '+' : ''}
+            {values.temperature} ({values.temperature > 0 ? 'warmer' : 'cooler'})
           </span>
         ) : null}
         {values.tintStrength > 0 ? (

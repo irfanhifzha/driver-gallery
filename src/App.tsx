@@ -39,20 +39,34 @@ function App() {
     }
   }
 
+  const clearFolder = () => {
+    setFolderId('')
+    try {
+      localStorage.removeItem(STORAGE_KEY)
+    } catch {
+      // Private mode: nothing was stored anyway.
+    }
+  }
+
   return (
     <div className="app">
       {/* Both siblings remount when the folder changes, so the keys are
           namespaced to stay unique among siblings. */}
-      <FolderBar key={`bar:${folderId}`} folderId={folderId} onApply={applyFolder} />
+      <FolderBar
+        key={`bar:${folderId}`}
+        folderId={folderId}
+        onApply={applyFolder}
+        onClear={clearFolder}
+      />
 
       {folderId ? (
         <Gallery key={`gallery:${folderId}`} folderId={folderId} />
       ) : (
         <div className="state">
-          <h2>Pick a folder</h2>
+          <h2>Nothing here yet</h2>
           <p>
-            Paste a public Google Drive folder link or ID above to load its
-            photos.
+            Paste a public Google Drive folder link or ID above and press
+            <strong> Load folder</strong> to start browsing.
           </p>
         </div>
       )}
