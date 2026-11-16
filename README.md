@@ -64,6 +64,8 @@ content through the API.
 | Loading or refreshing a folder | **one** `files.list` per 1000 files | 100 quota units |
 | Scrolling, paging, filtering, search, RAW toggle | none (client-side) | 0 |
 | Opening the lightbox / grid thumbnails | none — signed CDN URLs | 0 |
+| High-quality toggle (opt-in) | none — signed CDN URL, no API key | 0 |
+| "Original in Drive" link | none — Google's own page | 0 |
 | File info panel, zoom, adjustments | none (same listing data) | 0 |
 
 - A 70-photo folder is a single `files.list` → **100 quota units**, cached in
@@ -223,6 +225,15 @@ src/
   `filter: …` string, with Reset, and is preview-only — nothing is saved,
   exported, or written to Drive. Esc closes the panel before the viewer, and
   settings reset when changing photos.
+- High quality (opt-in): the lightbox always loads the 1600 px thumbnail first.
+  **High quality** preloads the original (`=s0` when the file has a signed
+  thumbnail link, else `sz=w3200`) off-screen and swaps it in only once it
+  decodes, so the thumbnail never blanks out. The pill shows the original file
+  size before loading, remembers the choice for the browser session
+  (`sessionStorage["drive-gallery:highres"]`), and falls back to the thumbnail
+  with a retryable note if the large image fails. **Original in Drive** opens
+  the file in Drive for real downloads and for RAW/NEF. Neither action is a
+  Drive API call.
 - File info: **Info** in the lightbox opens a panel with file name, type, size,
   pixel dimensions, capture time, camera and lens, exposure time, aperture, ISO,
   focal length, flash, GPS coordinates, and modified date. Fields Drive does not
@@ -353,12 +364,16 @@ Consequences:
 - At 5× zoom the lightbox shows interpolated pixels; that is the cap, not a bug.
 - Originals would need `files.get?alt=media` with OAuth.
 
-To raise the ceiling, change the default in `src/lib/drive.ts`
-(`fullSrc(id, w = 1600)`) or the lightbox call site; the same endpoint accepts
-larger widths such as `sz=w2400`, at the cost of a bigger download. The signed
-`thumbnailLink` also accepts `=s0`, which returned the **exact original bytes**
-(2,053,200 bytes for the file above) with no extra API call — but only when
-`thumbnailLink` exists, and those URLs expire after a few hours.
+The lightbox keeps `sz=w1600` as the default and offers an opt-in **High
+quality** toggle (see [UI behaviour](#ui-behaviour)) that requests `=s0` when a
+signed `thumbnailLink` exists — this returned the **exact original bytes**
+(2,053,200 bytes for the file above) with no extra API call — and falls back to
+`sz=w3200` otherwise. Signed URLs expire after a few hours, and neither source
+costs Drive API quota.
+
+To change the defaults instead of toggling, edit `fullSrc(id, w = 1600)` or
+`highResSrc()` in `src/lib/drive.ts`; the endpoint accepts larger widths such as
+`sz=w2400` at the cost of a bigger download.
 
 ## Supported image formats
 

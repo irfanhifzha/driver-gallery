@@ -3,6 +3,9 @@
 > Goal: show the normal (already sharp) thumbnail first, and let the visitor
 > switch a single photo to high quality on demand. Default stays low-res so
 > browsing is cheap; nothing here adds API usage.
+>
+> **Status:** implemented (tasks below checked). Build and lint pass; the
+> visual/keyboard checks still need a browser pass.
 
 ## Cost facts (read this before choosing an approach)
 
@@ -62,17 +65,16 @@ stall or crash older phones. Hence: opt-in per photo, default off.
 
 ## Tasks
 
-- [ ] Add a `quality` state to the lightbox (`'thumbnail' | 'high'`), default
+- [x] Add a `quality` state to the lightbox (`'thumbnail' | 'high'`), default
       `'thumbnail'`, seeded from `sessionStorage`.
-- [ ] Build the high-res URL helper (`=s0` when `thumbnailLink` exists, else
+- [x] Build the high-res URL helper (`=s0` when `thumbnailLink` exists, else
       `fullSrc(id, 3200)`) next to `fullSrc` in `src/lib/drive.ts`.
-- [ ] Implement preload-then-swap with a loading state and error fallback.
-- [ ] Add the toggle pill, `aria-pressed`, and the file-size label.
-- [ ] Add "Open original in Drive" (`/file/d/<id>/view`, `target="_blank"`,
+- [x] Implement preload-then-swap with a loading state and error fallback.
+- [x] Add the toggle pill, `aria-pressed`, and the file-size label.
+- [x] Add "Open original in Drive" (`/file/d/<id>/view`, `target="_blank"`,
       `rel="noreferrer"`).
-- [ ] Re-check the top-right control spacing on mobile (close / Adjust / Info /
-      High quality / Original must not collide).
-- [ ] Document the toggle in `README.md` (UI behaviour + cost section).
+- [ ] Re-check the control spacing on mobile now that the tools row can wrap.
+- [x] Document the toggle in `README.md` (UI behaviour + cost section).
 
 ## Verification
 
@@ -83,4 +85,4 @@ stall or crash older phones. Hence: opt-in per photo, default off.
 - [ ] A file with no `thumbnailLink` still reaches high quality via the
       `fullSrc(id, 3200)` fallback.
 - [ ] RAW/NEF still reach the Drive link and never break the layout.
-- [ ] `npm run build` and `npm run lint` pass with zero warnings.
+- [x] `npm run build` and `npm run lint` pass with zero warnings.
