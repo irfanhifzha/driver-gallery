@@ -61,7 +61,7 @@
   font-size: 12.5px;
   color: var(--text);
   white-space: nowrap;
-  user-select: none;
+  cursor: text;
 }
 
 .folder-input {

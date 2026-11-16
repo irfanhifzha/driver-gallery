@@ -533,7 +533,7 @@ the current model (public folder, API key, static site, no backend).
 
 ### Near term (small, no new services)
 
-- Remembering the sort choice across reloads; random shuffle stays the default.
+- Remembering the sort choice across reloads.
 - Persist adjustments per photo in `localStorage`, or export a processed image.
   Export needs canvas + CORS, and the thumbnail hosts are unlikely to allow
   `crossOrigin="anonymous"`, so it may require a same-origin proxy.
