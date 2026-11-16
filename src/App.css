@@ -164,6 +164,69 @@
   padding-bottom: 4px;
 }
 
+/* ---------- View / editor switch ---------- */
+
+.mode-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+}
+
+.mode-switch {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.mode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 15px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.mode-btn svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+.mode-btn:hover:not([aria-pressed='true']) {
+  color: var(--accent-strong);
+}
+
+.mode-btn[aria-pressed='true'] {
+  color: var(--text-h);
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(34, 31, 26, 0.12);
+}
+
+.mode-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mode-hint {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text);
+}
+
 .toggle {
   display: inline-flex;
   align-items: center;
@@ -1065,6 +1128,38 @@
   touch-action: none;
 }
 
+/* A crop is previewed by fitting the photo to a fixed frame. The frame's width
+   is bounded by the visible photo height, so both the ratio and the lightbox
+   fit are respected without measuring the image. */
+.lightbox-crop {
+  width: min(
+    calc(100vw - (var(--lightbox-gap) * 2) - 8px),
+    calc(var(--lightbox-photo-max-height) * var(--crop-ratio))
+  );
+  aspect-ratio: var(--crop-ratio);
+  overflow: hidden;
+  background: #000;
+  cursor: grab;
+  touch-action: none;
+}
+
+.lightbox-crop.is-cropping {
+  cursor: grabbing;
+}
+
+.lightbox-crop img {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: cover;
+  object-position: calc(50% + var(--crop-x) * 50%)
+    calc(50% + var(--crop-y) * 50%);
+  transform: scale(var(--crop-zoom));
+  transform-origin: center;
+  pointer-events: none;
+}
+
 .lightbox-tint {
   position: absolute;
   inset: 0;
@@ -1378,6 +1473,182 @@
 }
 
 .adjust-reset:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+/* ---------- Crop controls ---------- */
+
+.crop-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.crop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.crop-head h3 {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #cfc9bf;
+}
+
+.crop-clear {
+  padding: 0;
+  font: inherit;
+  font-size: 11.5px;
+  color: #a9a49b;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.crop-clear:hover {
+  color: #fff;
+}
+
+.crop-ratios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.crop-ratio {
+  padding: 6px 11px;
+  font: inherit;
+  font-size: 11.5px;
+  color: #f3f4f6;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.crop-ratio:hover:not([aria-pressed='true']) {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.crop-ratio[aria-pressed='true'] {
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.crop-ratio:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.crop-custom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.crop-custom-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.crop-custom input {
+  width: 72px;
+  min-width: 0;
+  padding: 6px 9px;
+  font: inherit;
+  font-size: 12px;
+  color: #f3f4f6;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+}
+
+.crop-set {
+  padding: 6px 11px;
+  font: inherit;
+  font-size: 11.5px;
+  color: #f3f4f6;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.crop-set:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.crop-set:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.crop-set:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.crop-custom input:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.crop-custom input[aria-invalid='true'] {
+  border-color: #e08b81;
+}
+
+.crop-hint {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #a9a49b;
+}
+
+.crop-error {
+  margin: 0;
+  font-size: 11.5px;
+  color: #f0a49c;
+}
+
+.adjust-save {
+  align-self: flex-start;
+  padding: 9px 16px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.adjust-save:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.adjust-save:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.adjust-save:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 3px;
 }

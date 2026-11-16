@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { PointerEvent as ReactPointerEvent } from 'react'
+import type {
+  CSSProperties,
+  PointerEvent as ReactPointerEvent,
+} from 'react'
 import { fullSrc, type DriveImage } from '../lib/drive'
 import type { FavoriteMap } from '../lib/favorites'
 import {
@@ -9,8 +12,11 @@ import {
   whiteBalanceOverlay,
   type Adjustments,
 } from '../lib/adjustments'
+import { clampCrop, type Crop } from '../lib/crop'
+import type { EditMap, PhotoEdit } from '../lib/edits'
 import { AdjustPanel } from './AdjustPanel'
 import { InfoPanel } from './InfoPanel'
+import type { GalleryMode } from './ModeBar'
 import { metadataRows } from '../lib/metadata'
 
 const MIN_ZOOM = 1
@@ -40,6 +46,10 @@ type LightboxProps = {
   images: DriveImage[]
   index: number
   favorites: FavoriteMap
+  mode: GalleryMode
+  /** Saved crop/colour per file id, read from localStorage by the gallery. */
+  edits: EditMap
+  onSaveEdit: (id: string, edit: PhotoEdit) => void
   onIndexChange: (index: number) => void
   onToggleFavorite: (image: DriveImage) => void
   onClose: () => void
@@ -49,6 +59,9 @@ export function Lightbox({
   images,
   index,
   favorites,
+  mode,
+  edits,
+  onSaveEdit,
   onIndexChange,
   onToggleFavorite,
   onClose,
@@ -98,9 +111,25 @@ export function Lightbox({
   /** Live horizontal offset while a swipe is in progress. */
   const [swipeX, setSwipeX] = useState(0)
   const [settling, setSettling] = useState(false)
-  const [adjustments, setAdjustments] =
-    useState<Adjustments>(DEFAULT_ADJUSTMENTS)
-  const [adjustOpen, setAdjustOpen] = useState(false)
+  const savedEdit = images[index] ? edits[images[index].id] : undefined
+  const [adjustments, setAdjustments] = useState<Adjustments>(
+    () => savedEdit?.adjust ?? DEFAULT_ADJUSTMENTS,
+  )
+  const [crop, setCrop] = useState<Crop | null>(() => savedEdit?.crop ?? null)
+  const [dirty, setDirty] = useState(false)
+  const [cropping, setCropping] = useState(false)
+  const cropDragRef = useRef<{
+    pointerId: number
+    startX: number
+    startY: number
+    originX: number
+    originY: number
+    width: number
+    height: number
+  } | null>(null)
+  // Editor mode opens with the advanced panel showing; view mode keeps it
+  // closed until asked for, with edits still previewed.
+  const [adjustOpen, setAdjustOpen] = useState(mode === 'editor')
   const [infoOpen, setInfoOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
 
@@ -129,11 +158,29 @@ export function Lightbox({
 
   const resetAdjustments = useCallback(() => {
     setAdjustments(DEFAULT_ADJUSTMENTS)
+    setCrop(null)
+    setDirty(true)
   }, [])
 
   const updateAdjustments = useCallback((patch: Partial<Adjustments>) => {
     setAdjustments((prev) => ({ ...prev, ...patch }))
+    setDirty(true)
   }, [])
+
+  const updateCrop = useCallback((next: Crop | null) => {
+    setCrop(next)
+    setDirty(true)
+  }, [])
+
+  const saveEdit = useCallback(() => {
+    if (!image) return
+    onSaveEdit(image.id, {
+      adjust: adjustments,
+      crop,
+      updatedAt: new Date().toISOString(),
+    })
+    setDirty(false)
+  }, [adjustments, crop, image, onSaveEdit])
 
   const closeAdjust = useCallback(() => {
     setAdjustOpen(false)
@@ -169,21 +216,27 @@ export function Lightbox({
     setShortcutsOpen(true)
   }, [])
 
-  const goPrev = useCallback(() => {
-    if (index > 0) {
+  /** Moving to another photo loads that photo's saved edit, not the last one. */
+  const goTo = useCallback(
+    (next: number) => {
+      const saved = images[next] ? edits[images[next].id] : undefined
+      setAdjustments(saved?.adjust ?? DEFAULT_ADJUSTMENTS)
+      setCrop(saved?.crop ?? null)
+      setDirty(false)
+      setAdjustOpen(mode === 'editor')
       resetZoom()
-      resetAdjustments()
-      onIndexChange(index - 1)
-    }
-  }, [index, onIndexChange, resetAdjustments, resetZoom])
+      onIndexChange(next)
+    },
+    [edits, images, mode, onIndexChange, resetZoom],
+  )
+
+  const goPrev = useCallback(() => {
+    if (index > 0) goTo(index - 1)
+  }, [goTo, index])
 
   const goNext = useCallback(() => {
-    if (index < images.length - 1) {
-      resetZoom()
-      resetAdjustments()
-      onIndexChange(index + 1)
-    }
-  }, [index, images.length, onIndexChange, resetAdjustments, resetZoom])
+    if (index < images.length - 1) goTo(index + 1)
+  }, [goTo, images.length, index])
 
   /**
    * Zoom around a screen point. The image is centred in its frame and
@@ -608,6 +661,73 @@ export function Lightbox({
     settleSwipe()
   }
 
+  const handleImageError = () => {
+    if (!image) return
+    console.error('[drive-gallery] lightbox image failed to load', {
+      name: image.name,
+      mimeType: image.mimeType,
+      id: image.id,
+    })
+    setFailedId(image.id)
+    setAdjustOpen(false)
+  }
+
+  // Crop repositioning lives on the crop frame; stopping propagation keeps the
+  // lightbox's pan and swipe gestures out of it.
+  const startCropDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!crop || mode !== 'editor') return
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+
+    event.stopPropagation()
+    const rect = event.currentTarget.getBoundingClientRect()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    cropDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: crop.x,
+      originY: crop.y,
+      width: rect.width,
+      height: rect.height,
+    }
+    setCropping(true)
+  }
+
+  const moveCropDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = cropDragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+
+    event.stopPropagation()
+    event.preventDefault()
+
+    // A full half-width drag covers the whole pan range, which matches how far
+    // the covered photo can actually move inside the frame.
+    const dx = event.clientX - drag.startX
+    const dy = event.clientY - drag.startY
+    setCrop((prev) =>
+      prev
+        ? clampCrop({
+            ...prev,
+            x: drag.originX - dx / Math.max(1, drag.width / 2),
+            y: drag.originY - dy / Math.max(1, drag.height / 2),
+          })
+        : prev,
+    )
+    setDirty(true)
+  }
+
+  const endCropDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = cropDragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+
+    event.stopPropagation()
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    cropDragRef.current = null
+    setCropping(false)
+  }
+
   if (!image) return null
 
   const whiteBalanceStyle = whiteBalanceOverlay(adjustments)
@@ -809,25 +929,42 @@ export function Lightbox({
                   : undefined,
               }}
             >
-              <img
-                src={fullSrc(image.id)}
-                alt={image.name}
-                referrerPolicy="no-referrer"
-                draggable={false}
-                onDragStart={(event) => event.preventDefault()}
-                onError={() => {
-                  console.error(
-                    '[drive-gallery] lightbox image failed to load',
-                    {
-                      name: image.name,
-                      mimeType: image.mimeType,
-                      id: image.id,
-                    },
-                  )
-                  setFailedId(image.id)
-                  setAdjustOpen(false)
-                }}
-              />
+              {crop ? (
+                <div
+                  className={`lightbox-crop${cropping ? ' is-cropping' : ''}`}
+                  style={{ '--crop-ratio': crop.ratio } as CSSProperties}
+                  onPointerDown={startCropDrag}
+                  onPointerMove={moveCropDrag}
+                  onPointerUp={endCropDrag}
+                  onPointerCancel={endCropDrag}
+                  onDoubleClick={(event) => event.stopPropagation()}
+                >
+                  <img
+                    src={fullSrc(image.id)}
+                    alt={image.name}
+                    referrerPolicy="no-referrer"
+                    draggable={false}
+                    style={
+                      {
+                        '--crop-x': crop.x,
+                        '--crop-y': crop.y,
+                        '--crop-zoom': crop.zoom,
+                      } as CSSProperties
+                    }
+                    onDragStart={(event) => event.preventDefault()}
+                    onError={handleImageError}
+                  />
+                </div>
+              ) : (
+                <img
+                  src={fullSrc(image.id)}
+                  alt={image.name}
+                  referrerPolicy="no-referrer"
+                  draggable={false}
+                  onDragStart={(event) => event.preventDefault()}
+                  onError={handleImageError}
+                />
+              )}
               {adjustments.tintStrength > 0 ? (
                 <span
                   className="lightbox-tint"
@@ -874,8 +1011,13 @@ export function Lightbox({
           id={PANEL_ID}
           panelRef={panelRef}
           values={adjustments}
+          crop={crop}
+          mode={mode}
+          dirty={dirty}
           onChange={updateAdjustments}
+          onCropChange={updateCrop}
           onReset={resetAdjustments}
+          onSave={saveEdit}
           onClose={closeAdjust}
         />
       ) : null}

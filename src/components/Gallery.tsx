@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Filters } from './Filters'
 import { ImageGrid } from './ImageGrid'
 import { Lightbox } from './Lightbox'
+import { ModeBar, type GalleryMode } from './ModeBar'
 import { Pagination } from './Pagination'
 import {
   EmptyState,
@@ -13,6 +14,12 @@ import { Toolbar } from './Toolbar'
 import { useDriveImages } from '../hooks/useDriveImages'
 import { fileType, withoutRawDuplicates, type DriveImage } from '../lib/drive'
 import { readUrlState, updateUrl } from '../lib/urlState'
+import {
+  readEdits,
+  writeEdits,
+  type EditMap,
+  type PhotoEdit,
+} from '../lib/edits'
 import {
   favoritesToJson,
   readFavorites,
@@ -40,6 +47,10 @@ export function Gallery({ folderId }: GalleryProps) {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [favorites, setFavorites] = useState<FavoriteMap>(readFavorites)
   const [openIndex, setOpenIndex] = useState<number | null>(null)
+  // View mode only previews; editor mode opens Adjust with each photo and can
+  // save crop/colour per file. Edits live in localStorage, never on Drive.
+  const [mode, setMode] = useState<GalleryMode>('view')
+  const [edits, setEdits] = useState<EditMap>(readEdits)
   // A `?photo=` deep link is resolved once the listing is available; while it
   // is pending, the URL is left alone so the parameter isn't cleared first.
   const [pendingPhoto, setPendingPhoto] = useState<string | null>(
@@ -211,6 +222,12 @@ export function Gallery({ folderId }: GalleryProps) {
     resetPaging()
   }
 
+  const handleSaveEdit = (id: string, edit: PhotoEdit) => {
+    const next = { ...edits, [id]: edit }
+    setEdits(next)
+    writeEdits(next)
+  }
+
   const handleResetFilters = () => {
     setQuery('')
     setType('all')
@@ -228,6 +245,8 @@ export function Gallery({ folderId }: GalleryProps) {
         onRefresh={handleRefresh}
         onToggleHideRaw={handleToggleHideRaw}
       />
+
+      <ModeBar mode={mode} onChange={setMode} />
 
       <main>
         {images.length > 0 ? (
@@ -322,6 +341,9 @@ export function Gallery({ folderId }: GalleryProps) {
           images={pageImages}
           index={activeIndex}
           favorites={favorites}
+          mode={mode}
+          edits={edits}
+          onSaveEdit={handleSaveEdit}
           onIndexChange={setOpenIndex}
           onToggleFavorite={handleToggleFavorite}
           onClose={() => setOpenIndex(null)}
