@@ -56,7 +56,8 @@ src/
 │                              #   + RAW/JPEG duplicate helpers
 ├─ hooks/useDriveImages.ts    # fetch lifecycle, auto-pagination, full-listing cache
 ├─ components/
-│  ├─ Toolbar.tsx             # title, photo count, refresh button
+│  ├─ Toolbar.tsx             # title, photo count, RAW toggle, refresh
+│  ├─ Filters.tsx             # file-name search + file-type select + reset
 │  ├─ ImageGrid.tsx           # <ul> grid of cards
 │  ├─ ImageCard.tsx           # lazy <img>, shimmer skeleton, retry + onError fallback
 │  ├─ Lightbox.tsx            # full-size view, ←/→/Esc, focus trap, scroll lock
@@ -91,10 +92,14 @@ src/
 5. The listing is shuffled in `useDriveImages`, and `imageMediaMetadata`
    width/height (requested in `FIELDS`) sets each tile's aspect ratio, so the
    masonry order changes per visit while the layout reserves space before load.
-6. Paging is **client-side**: `App` slices the cached listing into
-   `PER_PAGE = 24` chunks (`src/App.tsx`) and renders `Pagination`. No extra API
-   requests, stable page boundaries, and the lightbox navigates within the
-   current page. Changing page scrolls to top; Refresh returns to page 1.
+6. `App` filters before paging: case-insensitive file-name search → file-type
+   select (options and counts derived from the listing, e.g. `JPEG`, `NEF`) →
+   `withoutRawDuplicates` (when its toggle is on) → `PER_PAGE = 24` slice.
+   Filtering is purely client-side, resets to page 1, and adds no API requests.
+7. Paging is **client-side**: the filtered array is sliced into 24-photo chunks
+   and rendered by `Pagination`. Page boundaries are stable, and the lightbox
+   navigates within the current page. Changing page scrolls to top; Refresh
+   returns to page 1.
 
 ### Invariants to preserve
 
@@ -126,6 +131,11 @@ src/
   zoomed, double-click toggles 2.5×/1×, and `+`, `-`, `0` zoom in/out/reset from
   the keyboard. The scaled image is clipped to its frame so it never covers the
   caption or arrows; zoom resets when changing photos.
+- Search & type filter: the search field matches file names case-insensitively
+  (with a clear button); the Type select lists only the types present in the
+  folder with counts. Both combine with the RAW toggle and pagination, reset to
+  page 1 on change, and show a "No photos match" state with **Clear filters**
+  when nothing matches.
 - RAW filter: a toolbar checkbox (default on) hides RAW files (NEF, NRW, CR2,
   CR3, ARW, DNG, RAF, RW2, ORF, SRW, PEF, RWL, X3F, MOS, ERF, KDC, MRW, plus
   `image/x-*` MIME types) **only when a JPEG with the same base file name
@@ -135,6 +145,9 @@ exists**, so NEF+JPG pairs show once and lone RAW shots stay visible. Matching i
 - Pagination: "Showing 25–48 of 70", Prev/Next, and numbered page buttons
   (first/last plus current ±1 with ellipsis for long folders). `aria-current`
   marks the active page. 24 photos per page, configurable via `PER_PAGE`.
+  The range label and controls sit in a sticky pill dock pinned to the bottom of
+  the viewport (`.pager-bar`, `position: sticky; bottom: 16px`) while the grid
+  scrolls; it settles into normal flow at the end of the page.
 - Page states: loading grid, empty folder, error + "Try again", inline page error
   when cached images are still on screen, and a "Loading all photos…" indicator
   while remaining pages are fetched in the background.
@@ -256,5 +269,5 @@ q: `'${folderId}' in parents and trashed = false and (
 
 ## Not implemented
 
-Plan nice-to-haves that remain open: name filter, sort by name/date, `?folder=`
-URL parameter, and production deployment (host + referrer allowlist + env vars).
+Plan nice-to-haves that remain open: sort by name/date, `?folder=` URL
+parameter, and production deployment (host + referrer allowlist + env vars).

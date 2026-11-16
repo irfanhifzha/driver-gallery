@@ -28,7 +28,9 @@ export function Toolbar({
       <div className="toolbar-heading">
         <p className="eyebrow">Shared Drive folder</p>
         <h1>Photo Gallery</h1>
-        <p className="subtitle">{label}</p>
+        <p className="subtitle" aria-live="polite">
+          {label}
+        </p>
       </div>
       <div className="toolbar-actions">
         {duplicateCount > 0 ? (

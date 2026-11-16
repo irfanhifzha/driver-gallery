@@ -78,6 +78,23 @@ export const isJpegImage = (f: DriveImage) =>
 const baseName = (name: string) =>
   name.replace(/\.[^./\\]+$/, "").toLowerCase();
 
+const TYPE_ALIASES: Record<string, string> = {
+  jpg: "JPEG",
+  jpeg: "JPEG",
+  tif: "TIFF",
+  tiff: "TIFF",
+  heic: "HEIC",
+  heif: "HEIF",
+};
+
+/** Display label for a file's type, e.g. "JPEG", "NEF", "PNG". */
+export const fileType = (f: DriveImage) => {
+  const extension = f.name.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase();
+  if (extension) return TYPE_ALIASES[extension] ?? extension.toUpperCase();
+  const subtype = f.mimeType.split("/")[1] ?? f.mimeType;
+  return subtype.toUpperCase();
+};
+
 /**
  * Drop RAW files that have a JPEG sibling with the same base name, so folders
  * holding both NEF + JPG versions of a shot don't show every photo twice.

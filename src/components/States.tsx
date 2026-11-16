@@ -25,6 +25,18 @@ export function EmptyState() {
   )
 }
 
+export function NoMatchesState({ onClear }: { onClear: () => void }) {
+  return (
+    <div className="state">
+      <h2>No photos match</h2>
+      <p>Try a different file name or file type.</p>
+      <button type="button" className="btn" onClick={onClear}>
+        Clear filters
+      </button>
+    </div>
+  )
+}
+
 export function ErrorState({ message, title, onRetry }: ErrorStateProps) {
   return (
     <div className="state state-error" role="alert">

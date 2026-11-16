@@ -1,13 +1,19 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import './App.css'
+import { Filters } from './components/Filters'
 import { ImageGrid } from './components/ImageGrid'
 import { Lightbox } from './components/Lightbox'
 import { Pagination } from './components/Pagination'
-import { EmptyState, ErrorState, LoadingGrid } from './components/States'
+import {
+  EmptyState,
+  ErrorState,
+  LoadingGrid,
+  NoMatchesState,
+} from './components/States'
 import { Toolbar } from './components/Toolbar'
 import { config, configError } from './config'
 import { useDriveImages } from './hooks/useDriveImages'
-import { withoutRawDuplicates } from './lib/drive'
+import { fileType, withoutRawDuplicates } from './lib/drive'
 
 /** Photos per page. The full listing is cached, so paging is instant. */
 const PER_PAGE = 24
@@ -16,7 +22,20 @@ function App() {
   const { images, loading, error, refresh } = useDriveImages()
   const [page, setPage] = useState(1)
   const [hideRaw, setHideRaw] = useState(true)
+  const [query, setQuery] = useState('')
+  const [type, setType] = useState('all')
   const [openIndex, setOpenIndex] = useState<number | null>(null)
+
+  const types = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const image of images) {
+      const label = fileType(image)
+      counts.set(label, (counts.get(label) ?? 0) + 1)
+    }
+    return [...counts.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([label, count]) => ({ label, count }))
+  }, [images])
 
   if (!config) {
     return (
@@ -26,9 +45,15 @@ function App() {
     )
   }
 
-  const deduped = withoutRawDuplicates(images)
-  const duplicateCount = images.length - deduped.length
-  const shown = hideRaw ? deduped : images
+  const needle = query.trim().toLowerCase()
+  const filtered = images.filter((image) => {
+    if (needle && !image.name.toLowerCase().includes(needle)) return false
+    if (type !== 'all' && fileType(image) !== type) return false
+    return true
+  })
+  const deduped = withoutRawDuplicates(filtered)
+  const duplicateCount = filtered.length - deduped.length
+  const shown = hideRaw ? deduped : filtered
 
   const hasImages = shown.length > 0
   const pageCount = Math.max(1, Math.ceil(shown.length / PER_PAGE))
@@ -38,9 +63,13 @@ function App() {
   const activeIndex =
     openIndex !== null && openIndex < pageImages.length ? openIndex : null
 
-  const handleRefresh = () => {
+  const resetPaging = () => {
     setPage(1)
     setOpenIndex(null)
+  }
+
+  const handleRefresh = () => {
+    resetPaging()
     refresh()
   }
 
@@ -52,8 +81,23 @@ function App() {
 
   const handleToggleHideRaw = (hide: boolean) => {
     setHideRaw(hide)
-    setPage(1)
-    setOpenIndex(null)
+    resetPaging()
+  }
+
+  const handleQueryChange = (value: string) => {
+    setQuery(value)
+    resetPaging()
+  }
+
+  const handleTypeChange = (value: string) => {
+    setType(value)
+    resetPaging()
+  }
+
+  const handleResetFilters = () => {
+    setQuery('')
+    setType('all')
+    resetPaging()
   }
 
   return (
@@ -68,29 +112,46 @@ function App() {
       />
 
       <main>
+        {images.length > 0 ? (
+          <Filters
+            query={query}
+            type={type}
+            types={types}
+            onQueryChange={handleQueryChange}
+            onTypeChange={handleTypeChange}
+            onReset={handleResetFilters}
+          />
+        ) : null}
+
         {loading && !hasImages ? <LoadingGrid /> : null}
 
         {error && !hasImages ? (
           <ErrorState message={error} onRetry={handleRefresh} />
         ) : null}
 
-        {!loading && !error && !hasImages ? <EmptyState /> : null}
+        {!loading && !error && images.length === 0 ? <EmptyState /> : null}
+
+        {!loading && !error && images.length > 0 && !hasImages ? (
+          <NoMatchesState onClear={handleResetFilters} />
+        ) : null}
 
         {hasImages ? (
           <>
             <ImageGrid images={pageImages} onOpen={setOpenIndex} />
 
             {pageCount > 1 ? (
-              <p className="page-range">
-                Showing {start + 1}–{start + pageImages.length} of {shown.length}
-              </p>
+              <div className="pager-bar">
+                <p className="page-range">
+                  Showing {start + 1}–{start + pageImages.length} of{' '}
+                  {shown.length}
+                </p>
+                <Pagination
+                  page={currentPage}
+                  pageCount={pageCount}
+                  onPageChange={goToPage}
+                />
+              </div>
             ) : null}
-
-            <Pagination
-              page={currentPage}
-              pageCount={pageCount}
-              onPageChange={goToPage}
-            />
 
             <div className="gallery-footer">
               {error ? (
