@@ -1,11 +1,18 @@
 .app {
   width: 100%;
-  max-width: 1280px;
+  /* Near full-bleed: just a gutter, so the grid gets the screen width. */
+  max-width: none;
   margin: 0 auto;
-  padding: 48px 32px 72px;
+  padding: clamp(24px, 2.6vw, 40px) 20px 64px;
   display: flex;
   flex-direction: column;
   gap: 28px;
+}
+
+.app main {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
 }
 
 /* ---------- Folder picker ---------- */
@@ -13,22 +20,28 @@
 .folder-bar {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
 }
 
 .folder-form {
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-wrap: wrap;
-  gap: 10px;
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+  gap: 8px;
 }
 
 .folder-label {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--text);
 }
 
 /* The URL prefix is fixed chrome around the editable folder ID, so the field
@@ -37,11 +50,12 @@
   display: flex;
   align-items: center;
   flex: 1 1 360px;
+  max-width: 520px;
   min-width: 0;
   padding: 0 16px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 10px;
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease;
@@ -102,16 +116,16 @@
 /* Outline treatment so it sits beside the filled Load button as a secondary
    action rather than as inline body text. */
 .folder-drive {
-  margin-left: auto;
+  margin-left: 0;
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 8px 14px;
+  padding: 9px 14px;
   font-size: 13px;
-  color: var(--accent-strong);
+  color: var(--text-h);
   background: var(--surface);
-  border: 1px solid var(--accent-border);
-  border-radius: 999px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
   text-decoration: none;
   transition:
     background 0.2s ease,
@@ -129,39 +143,43 @@
 
 .folder-error {
   font-size: 13px;
+  text-align: center;
   color: #a4342a;
 }
 
 /* ---------- Header ---------- */
 
+/* Centred masthead: title, one-line subtitle, then the actions. No rule under
+   it, so the grid starts after whitespace rather than a divider. */
 .toolbar {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   flex-wrap: wrap;
-  gap: 24px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--border);
+  gap: 14px;
+  text-align: center;
 }
 
 .toolbar h1 {
   margin: 0;
-  font-size: clamp(30px, 4vw, 42px);
-  line-height: 1.1;
-  letter-spacing: -0.01em;
+  font-size: clamp(28px, 3.6vw, 40px);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
 }
 
 .subtitle {
-  margin-top: 6px;
+  max-width: 56ch;
+  margin: 8px auto 0;
   font-size: 13.5px;
 }
 
 .toolbar-actions {
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-wrap: wrap;
   gap: 14px;
-  padding-bottom: 4px;
 }
 
 /* ---------- View / editor switch ---------- */
@@ -169,18 +187,18 @@
 .mode-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   flex-wrap: wrap;
   gap: 10px 18px;
 }
 
 .mode-switch {
   display: inline-flex;
-  gap: 4px;
-  padding: 4px;
+  gap: 3px;
+  padding: 3px;
   background: var(--surface-muted);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 10px;
 }
 
 .mode-btn {
@@ -193,7 +211,7 @@
   color: var(--text);
   background: transparent;
   border: none;
-  border-radius: 999px;
+  border-radius: 7px;
   cursor: pointer;
   transition:
     background 0.2s ease,
@@ -213,7 +231,7 @@
 .mode-btn[aria-pressed='true'] {
   color: var(--text-h);
   background: var(--surface);
-  box-shadow: 0 1px 3px rgba(34, 31, 26, 0.12);
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 
 .mode-btn:focus-visible {
@@ -221,17 +239,21 @@
   outline-offset: 2px;
 }
 
+/* The hint is per-mode copy, so its changing width used to shove the mode
+   switch sideways. It now takes a full row of its own below the controls. */
 .mode-hint {
+  flex: 1 1 100%;
+  order: 3;
   margin: 0;
   font-size: 12.5px;
+  text-align: center;
   color: var(--text);
 }
 
+/* Lets the hint and the Edits menu participate in the bar's row layout
+   instead of being locked into one inline group. */
 .mode-bar-right {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px 16px;
+  display: contents;
 }
 
 /* Editor-only menu for the saved-edit document. */
@@ -249,7 +271,7 @@
   color: var(--text-h);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 10px;
   cursor: pointer;
   transition:
     background 0.2s ease,
@@ -283,7 +305,7 @@
   font-variant-numeric: tabular-nums;
   color: #fff;
   background: var(--accent);
-  border-radius: 999px;
+  border-radius: 6px;
 }
 
 .edits-dropdown {
@@ -298,7 +320,7 @@
   padding: 6px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 12px;
   box-shadow: var(--shadow-md);
 }
 
@@ -408,25 +430,18 @@
   font: inherit;
   font-size: 13.5px;
   font-weight: 600;
-  padding: 9px 18px;
+  padding: 10px 18px;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: 10px;
   color: #fff;
   background: var(--accent);
   cursor: pointer;
-  transition:
-    background 0.2s ease,
-    box-shadow 0.2s ease,
-    transform 0.15s ease;
+  transition: background 0.2s ease;
 }
 
+/* Flat on hover: colour shift only, no lift or glow. */
 .btn:hover:not(:disabled) {
   background: var(--accent-strong);
-  box-shadow: 0 8px 20px -10px rgba(15, 118, 110, 0.7);
-}
-
-.btn:active:not(:disabled) {
-  transform: translateY(1px);
 }
 
 .btn:disabled {
@@ -444,29 +459,30 @@
 .filters {
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-wrap: wrap;
-  gap: 12px;
-  padding-bottom: 20px;
+  gap: 10px 12px;
 }
 
 .filters-group {
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
 }
 
-/* Keep sorting on the far right so filters and ordering read as two groups. */
+/* Filters and ordering sit in one centred run, not pinned to opposite edges. */
 .filters-sort {
-  margin-left: auto;
+  margin-left: 0;
 }
 
 .search-field {
   position: relative;
   display: flex;
   align-items: center;
-  flex: 1 1 260px;
+  flex: 0 1 380px;
   min-width: 0;
 }
 
@@ -487,7 +503,7 @@
   padding: 11px 40px 11px 42px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 10px;
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease;
@@ -563,12 +579,12 @@
   color: var(--text-h);
   padding: 10px 34px 10px 14px;
   background-color: var(--surface);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6' fill='none' stroke='%236b6459' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6' fill='none'  stroke='%23667085' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 14px center;
   background-size: 12px 12px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 10px;
   cursor: pointer;
 }
 
@@ -587,7 +603,7 @@
   color: var(--text-h);
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 9px;
   cursor: pointer;
   transition:
     background 0.2s ease,
@@ -627,7 +643,7 @@
   color: var(--text-h);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 10px;
   cursor: pointer;
   transition:
     background 0.2s ease,
@@ -665,12 +681,12 @@
   min-height: 36px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 10px;
 }
 
 .favorites-menu .favorites-filter {
   border: none;
-  border-radius: 999px 0 0 999px;
+  border-radius: 9px 0 0 9px;
   background: transparent;
 }
 
@@ -690,7 +706,7 @@
   background: transparent;
   border: none;
   border-left: 1px solid var(--border);
-  border-radius: 0 999px 999px 0;
+  border-radius: 0 9px 9px 0;
   cursor: pointer;
   transition:
     background 0.2s ease,
@@ -729,7 +745,7 @@
   padding: 6px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 12px;
   box-shadow: var(--shadow-md);
 }
 
@@ -790,11 +806,11 @@
   font: inherit;
   font-size: 16px;
   line-height: 1;
-  padding: 7px 10px;
+  padding: 8px 11px;
   color: var(--text-h);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 9px;
   cursor: pointer;
   transition:
     background 0.2s ease,
@@ -845,9 +861,9 @@
   width: 26px;
   height: 26px;
   color: #fff;
-  background: rgba(15, 118, 110, 0.88);
+  background: rgba(16, 24, 40, 0.82);
   border-radius: 50%;
-  box-shadow: 0 1px 4px rgba(14, 12, 10, 0.3);
+  box-shadow: 0 1px 4px rgba(16, 24, 40, 0.28);
   pointer-events: none;
 }
 
@@ -1052,13 +1068,12 @@
   gap: 14px;
   width: fit-content;
   max-width: 100%;
-  margin-top: 24px;
+  margin-top: 4px;
   padding: 10px 14px;
-  background: rgba(255, 253, 249, 0.9);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  box-shadow: var(--shadow-md);
-  backdrop-filter: blur(12px);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
 }
 
 .page-range {
@@ -1088,7 +1103,7 @@
   height: 38px;
   padding: 0 12px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 9px;
   background: var(--surface);
   color: var(--text-h);
   cursor: pointer;
@@ -1134,9 +1149,7 @@
   justify-content: center;
   flex-wrap: wrap;
   gap: 16px;
-  margin-top: 36px;
-  padding-top: 24px;
-  border-top: 1px solid var(--border);
+  padding: 8px 0;
 }
 
 .muted {
@@ -1173,17 +1186,17 @@
 
 /* ---------- States ---------- */
 
+/* A quiet empty state: plain centred text on the page, no card around it. */
 .state {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 80px 28px;
+  gap: 12px;
+  padding: clamp(48px, 9vh, 104px) 24px;
   text-align: center;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) + 4px);
-  box-shadow: var(--shadow-sm);
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .state h2 {
@@ -1433,7 +1446,7 @@ in   view mode the crop is just a preview and keeps the zoom cursor. */
   padding: 2px 8px 2px 6px;
   font-size: 11px;
   color: #fff;
-  background: rgba(15, 118, 110, 0.85);
+  background: rgba(255, 255, 255, 0.16);
   border-radius: 999px;
   white-space: nowrap;
 }
@@ -1662,7 +1675,8 @@ in   view mode the crop is just a preview and keeps the zoom cursor. */
 .adjust-control input[type='range'] {
   width: 100%;
   margin: 0;
-  accent-color: var(--accent);
+  /* Dark panel: the ink accent would vanish, so the thumb stays light. */
+  accent-color: #e4e7ec;
   cursor: pointer;
 }
 
@@ -1777,11 +1791,13 @@ in   view mode the crop is just a preview and keeps the zoom cursor. */
   background: rgba(255, 255, 255, 0.16);
 }
 
+/* Selected chip is light-on-dark here: the page accent is ink, which would
+   disappear against the dark panels. */
 .crop-ratio[aria-pressed='true'] {
   font-weight: 600;
-  color: #fff;
-  background: var(--accent);
-  border-color: var(--accent);
+  color: #101828;
+  background: #f2f4f7;
+  border-color: #f2f4f7;
 }
 
 .crop-ratio:focus-visible {
@@ -1868,15 +1884,15 @@ in   view mode the crop is just a preview and keeps the zoom cursor. */
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
-  color: #fff;
-  background: var(--accent);
+  color: #101828;
+  background: #f2f4f7;
   border: none;
   border-radius: 999px;
   cursor: pointer;
 }
 
 .adjust-save:hover:not(:disabled) {
-  background: var(--accent-strong);
+  background: #ffffff;
 }
 
 .adjust-save:disabled {
@@ -2265,16 +2281,13 @@ in   view mode the crop is just a preview and keeps the zoom cursor. */
 
 @media (max-width: 640px) {
   .app {
-    padding: 28px 16px 56px;
+    padding: 24px 12px 48px;
+    gap: 24px;
   }
 
   .toolbar {
-    align-items: flex-start;
-    gap: 16px;
-  }
-
-  .toolbar-actions {
-    padding-bottom: 0;
+    align-items: center;
+    gap: 14px;
   }
 
   .filters {
@@ -2457,10 +2470,6 @@ in   view mode the crop is just a preview and keeps the zoom cursor. */
   .editor-tray {
     max-height: 24svh;
     padding: 8px 10px;
-  }
-
-  .mode-bar-right {
-    width: 100%;
   }
 
   .editor-tab {
