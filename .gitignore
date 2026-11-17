@@ -24,3 +24,5 @@ dist-ssr
 *.sw?
 
 .env.local
+tools/media_input/*
+tools/media_output/*

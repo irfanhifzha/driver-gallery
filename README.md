@@ -152,6 +152,12 @@ src/
 └─ index.css                  # warm light-theme tokens, base element styles
 ```
 
+Offline work sits outside `src/`: `tools/apply_edits.py` is a standalone
+reference implementation of the viewer pipeline (crop → filter → tint → white
+balance) that reads the JSON from **Edits → Export** and writes processed files
+to `tools/media_output/`. It is Python + Pillow + NumPy, not part of the build;
+its `--selftest` documents the expected colour and crop behaviour.
+
 ### Data flow
 
 1. `App` takes the folder from `?folder=<id>` when the address carries one,
@@ -657,20 +663,98 @@ q: `'${folderId}' in parents and trashed = false and (
 
 ## Roadmap (not implemented)
 
-Ideas only, roughly ordered by effort. Everything in the first two groups keeps
-the current model (public folder, API key, static site, no backend).
+Ideas only, roughly ordered by effort. *Near term* keeps the current model
+(public folder, API key, static site, no backend) and adds no services; the
+sections after *Where this could lead* are ordered by how much they change it.
 
 ### Near term (small, no new services)
 
-- Remembering the sort choice across reloads.
-- **Double-click a slider to reset it to defaults** (e.g. temperature → 0, brightness → 100%).
-- Persist adjustments per photo in `localStorage`, or export a processed image.
-  Export needs canvas + CORS, and the thumbnail hosts are unlikely to allow
-  `crossOrigin="anonymous"`, so it may require a same-origin proxy.
-- Optional infinite scroll alongside numbered pages (page number in the URL).
-- Tests: unit tests for filtering, RAW dedupe, and adjustment helpers; a small
-  browser smoke test for folder switching and the lightbox.
-- Production deployment (static host + referrer allowlist + env vars).
+**Editing and the edit document**
+
+- **Export the edited photos.** The saved JSON is self-contained, and
+  [`tools/apply_edits.py`](./tools/apply_edits.py) is the proof: it re-renders a
+  batch with Pillow + NumPy at roughly 0.6 s per 6 MP photo for a 1600 px output,
+  using the same crop math and the same filter/blend stack as the viewer. The
+  natural next step is a real in-browser export (`canvas`), which needs the
+  pixels to be CORS-readable — the thumbnail hosts are unlikely to cooperate, so
+  expect either a same-origin proxy or a "download JSON, run the script" flow.
+- Batch editing in the dock: apply the current look to the whole page, copy one
+  photo's adjustments to another, and "reset all colour, keep crops".
+- Crop improvements: a free-form ratio field, portrait/landscape flip of the
+  presets, arrow-key nudging, and a numeric zoom/pan readout.
+- Undo/redo per photo (the edit object is tiny, so a short in-memory stack is
+  enough) plus a "revert to last saved" that does not close the dock.
+- More sliders the CSS pipeline can carry without new dependencies: straighten/
+  rotate, vignette (radial-gradient overlay), and highlights/shadows
+  approximated with an extra `soft-light` layer.
+- Named presets ("Warm film", "High-key") stored in the same JSON envelope, so
+  a look can be applied across a folder in one click.
+
+**Browsing and discovery**
+
+- Remember the sort choice, RAW toggle, grid density (2/3/4 columns) and page
+  size per device.
+- Put filters in the URL (`?q=`, `?type=`, `?sort=`, `?page=`) so a filtered,
+  sorted view is shareable the way `?folder=`/`?photo=` already are.
+- Compare mode: pin one photo as "A" and flick between it and the current one.
+- Slideshow with an interval, following the active filter and sort.
+- Group by EXIF capture day (the listing already carries `time`), with a date
+  rail to jump between days.
+- Optional infinite scroll alongside numbered pages, "Surprise me" for large
+  folders, and a "seen recently" marker in `localStorage`.
+
+**Quality and operations**
+
+- Tests: unit tests for filtering, RAW dedupe, crop geometry and the adjustment
+  helpers (the Python `--selftest` documents the expected colour behaviour), plus
+  a browser smoke test for folder switching and the lightbox.
+- Production deployment: static host, referrer allowlist, env vars, cache
+  headers, and a documented rollback.
+- Distinguish Drive `403` (sharing/restriction) from `429` (rate limit) in the
+  UI, with a retry hint instead of one generic error string.
+- Accessibility pass: `aria-live` for "n photos match", visible focus on slider
+  rows, and full keyboard crop editing (currently pointer-driven).
+- A tiny settings panel (cache TTL, default sort, page size) instead of
+  constants, still all client-side.
+
+### Where this could lead
+
+Roughly ordered by how much new infrastructure each direction needs. All of them
+keep the browser as the only client; the question is where — and whether — the
+photos are processed.
+
+1. **A gallery that also exports.** The edit JSON is the product: a folder of
+   crop and colour decisions that can be replayed by the browser, by
+   `tools/apply_edits.py`, or by a desktop tool. That turns the site from a
+   viewer into a lightweight culling and editing front end, and batch export is
+   the first substantial feature that needs *no* Google call at all.
+2. **Curated share links.** Collections on top of the folder listing ("client
+   picks", "trip", "print candidates") kept as a small JSON document and shared
+   as `?collection=…` with the ids inside. Still no backend: the link carries the
+   ids and the listing resolves them.
+3. **Private folders via OAuth PKCE.** The one upgrade that changes the model:
+   per-user tokens, refresh handling, a consent screen, and a much larger app. It
+   buys private folders and per-user quota and costs the "open the link and it
+   works" simplicity — worth doing only when someone asks for it.
+4. **Offline-first PWA.** A service worker for the shell, the last listing, and
+   short-lived thumbnail caching would make repeat visits instant and let a
+   session survive a flaky connection. Signed URLs expire, so cache pixels
+   briefly and refresh listings when online.
+5. **Team review without accounts.** Ratings, flags and comments stored per
+   browser and exchanged as JSON export/import — exactly how the edits document
+   already works. A review round becomes "send me your JSON".
+6. **Gallery-as-a-service.** The edge-proxy idea below turns this into something
+   a photographer can hand to clients: one listing cache shared by all visitors,
+   the API key server-side, per-folder TTLs, and a custom domain. Same React app
+   plus a small serverless function and a KV store.
+7. **Print and album output.** Crop ratios are already the hard part; a contact
+   sheet or PDF layout built from the edit JSON (plus the exported renders) is a
+   natural extension and can run entirely locally.
+8. **AI-assisted culling and search.** Blur/duplicate detection, face grouping or
+   natural-language search ("the beach at sunset") all need a model, and so a
+   service: the first direction here that adds a paid dependency. The cheap
+   version is client-side heuristics (sharpness from a small canvas sample,
+   duplicates from EXIF time plus size) with no service at all.
 
 ### Folder scale (data volume)
 
