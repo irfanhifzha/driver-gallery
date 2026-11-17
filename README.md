@@ -212,6 +212,15 @@ src/
   `nextPageToken`, so a partial page-chain can never masquerade as the full folder.
 - **Never call `files.get` per image.** One listing request covers the whole
   folder; per-file requests blow through quota and hit 403s.
+- **The adjustment `filter` sits on the image elements, never on a wrapper.**
+  `.lightbox-image` carries only `transform`; both views apply `filterCss()` to
+  the `<img>` — in the lightbox that means the base photo *and* the HQ detail
+  layer — and then paint `…-tint` (`mix-blend-mode: color`) followed by `…-wb`
+  (`mix-blend-mode: soft-light`). Filtering the zoom wrapper instead runs the
+  blends *inside* the filter, which makes a temperature cast nearly disappear at
+  high saturation in the viewer while the grid shows it (and would leave the HQ
+  layer covering the filtered base with unfiltered pixels). Keep the order, the
+  CSS rules, and the filtered element identical between grid and lightbox.
 - **API errors are mapped once**, in `DriveError` / `friendly()` in
   `src/lib/drive.ts`. Hooks surface only user-readable strings.
 - `DriveError` must not use TypeScript constructor parameter properties —
@@ -243,12 +252,13 @@ src/
 - Live adjustments: **Adjust** opens a panel with brightness (50–150 %),
   contrast (50–150 %), saturation (0–200 %), temperature (−100 cooler … +100
   warmer), tint hue (0–360°) and tint strength (0–100 %) sliders. Changes render
-  instantly: a `filter` chain on the image, a `mix-blend-mode: soft-light`
-  overlay for temperature, and a `mix-blend-mode: color` overlay for tint, all
-  inside the zoom transform so they follow pan/zoom. The panel shows the live values and generated
-  `filter: …` string, with Reset, and is preview-only — nothing is saved,
-  exported, or written to Drive. Esc closes the panel before the viewer, and
-  settings reset when changing photos.
+  instantly: a `filter` chain on each image layer, a `mix-blend-mode: color`
+  overlay for tint, then a `mix-blend-mode: soft-light` overlay for temperature,
+  all inside the zoom transform so they follow pan/zoom. The grid card renders
+  the exact same stack, in the same order, so a tile and the viewer agree. The
+  panel shows the live values and generated `filter: …` string, with Reset, and
+  is preview-only — nothing is saved, exported, or written to Drive. Esc closes
+  the panel before the viewer, and settings reset when changing photos.
 - File info: **Info** in the lightbox opens a panel with file name, type, size,
   pixel dimensions, capture time, camera and lens, exposure time, aperture, ISO,
   focal length, flash, GPS coordinates, and modified date. Fields Drive does not
@@ -506,6 +516,14 @@ changed later:
    unzoomed layout size and then magnify by `transform: scale()`. That hid every
    extra pixel the sharper rendition added. The hint was removed, letting the
    browser re-rasterize at the zoomed size.
+6. **Filtering the wrong layer.** The viewer originally put the adjustment
+   `filter` on `.lightbox-image` — the same wrapper that holds the tint and
+   white-balance overlays. The blends then composited *inside* the filter, in the
+   reverse of the grid's order (grid: filter the `<img>`, blend on top), so a
+   strong temperature plus saturation was obvious in the grid and almost
+   invisible in the viewer. Filtering the wrapper also meant the HQ layer painted
+   unfiltered pixels over the filtered base. The `filter` now goes on every image
+   layer, with the detail layer included.
 
 Things that are correct but look wrong while debugging:
 

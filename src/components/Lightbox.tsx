@@ -841,6 +841,14 @@ export function Lightbox({
   if (!image) return null
 
   const whiteBalanceStyle = whiteBalanceOverlay(adjustments)
+  // Brightness/contrast/saturation belong on the image layers themselves, the
+  // way the grid does it. Filtering the wrapper instead would run the tint and
+  // white-balance blends *inside* the filter, so they composite in a different
+  // order than the grid (and the HQ layer would hide an unfiltered base image).
+  const imageFilter = hasAdjustments(adjustments)
+    ? filterCss(adjustments)
+    : undefined
+  const imageStyle = imageFilter ? { filter: imageFilter } : undefined
   // The base rendition always loads; the sharp one is painted over it as a
   // separate <img>, so no src swap is needed and a failure is invisible.
   const imageSrc = bestSrc(image, BASE_WIDTH)
@@ -1061,9 +1069,6 @@ export function Lightbox({
               }${cropEditing ? ' is-crop-editing' : ''}`}
               style={{
                 transform: `translate(${view.x + swipeX}px, ${view.y}px) scale(${view.scale})`,
-                filter: hasAdjustments(adjustments)
-                  ? filterCss(adjustments)
-                  : undefined,
               }}
             >
               {displayCrop ? (
@@ -1086,6 +1091,7 @@ export function Lightbox({
                     draggable={false}
                     onDragStart={(event) => event.preventDefault()}
                     onError={handleImageError}
+                    style={imageStyle}
                   />
                   {detail ? (
                     <img
@@ -1096,6 +1102,7 @@ export function Lightbox({
                       referrerPolicy="no-referrer"
                       draggable={false}
                       onDragStart={(event) => event.preventDefault()}
+                      style={imageStyle}
                     />
                   ) : null}
                 </div>
@@ -1108,6 +1115,7 @@ export function Lightbox({
                     draggable={false}
                     onDragStart={(event) => event.preventDefault()}
                     onError={handleImageError}
+                    style={imageStyle}
                   />
                   {detail ? (
                     <img
@@ -1118,17 +1126,11 @@ export function Lightbox({
                       referrerPolicy="no-referrer"
                       draggable={false}
                       onDragStart={(event) => event.preventDefault()}
+                      style={imageStyle}
                     />
                   ) : null}
                 </>
               )}
-              {whiteBalanceStyle ? (
-                <span
-                  className="lightbox-wb"
-                  aria-hidden="true"
-                  style={whiteBalanceStyle}
-                />
-              ) : null}
               {adjustments.tintStrength > 0 ? (
                 <span
                   className="lightbox-tint"
@@ -1137,6 +1139,13 @@ export function Lightbox({
                     background: `hsl(${adjustments.tintHue} 80% 50%)`,
                     opacity: adjustments.tintStrength / 100,
                   }}
+                />
+              ) : null}
+              {whiteBalanceStyle ? (
+                <span
+                  className="lightbox-wb"
+                  aria-hidden="true"
+                  style={whiteBalanceStyle}
                 />
               ) : null}
             </div>

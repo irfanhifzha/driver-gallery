@@ -1381,7 +1381,6 @@ in   view mode the crop is just a preview and keeps the zoom cursor. */
   inset: 0;
   pointer-events: none;
   mix-blend-mode: color;
-  z-index: 9999;
 }
 
 .lightbox-wb,
@@ -1390,12 +1389,6 @@ in   view mode the crop is just a preview and keeps the zoom cursor. */
   inset: 0;
   pointer-events: none;
   mix-blend-mode: soft-light;
-  z-index: 9999;
-}
-
-/* Keep the meta band below the tint/wb so the blends are visible */
-.lightbox-meta {
-  z-index: 1 !important;
 }
 
 /* Name, count and actions share one row at the top, level with the icon

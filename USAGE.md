@@ -79,10 +79,15 @@ what it stores, what it renders, and what it never does. For setup see
    - Because the base rendition is already loaded, opening a photo never waits
      on the sharp one, and a failed sharp fetch simply leaves the base image in
      place.
-10. **Adjust.** Brightness/contrast/saturation are a CSS `filter`; temperature
-    and tint are blend overlays inside the zoom transform. Preview only — no
-    request, no upload, no saved file. Settings reset when changing photos and
-    when the viewer closes.
+10. **Adjust.** Brightness/contrast/saturation are a CSS `filter` on the image
+    layers themselves (the base photo, and the sharp detail layer once it is
+    active) — never on the zoom container. Temperature (`soft-light`) and tint
+    (`color`) are blend overlays painted above the filtered image, tint first,
+    inside the zoom transform, which is exactly what a grid card does; that
+    parity is deliberate, because filtering the container would composite the
+    blends *before* the filter and make a warm cast vanish at high saturation.
+    Preview only — no request, no upload, no saved file. Settings reset when
+    changing photos and when the viewer closes.
 11. **Shortcuts.** Pressing `?` (or clicking the round **?** button beside
     **Info**) opens a panel listing `←`/`→`, `+`/`-`, `0`, double-click, `?`,
     and `Esc`. It is display-only and makes no request; `Esc` closes it before
@@ -216,7 +221,9 @@ Google's thumbnail CDN with URLs built from the listing's signed
   pagination, page state.
 - `src/components/Lightbox.tsx` — viewer, zoom, adjustments, info and
   keyboard-shortcut panels.
-- `src/lib/adjustments.ts` — filter string, Temperature/tint overlays.
+- `src/lib/adjustments.ts` — filter string, Temperature/tint overlays. Grid and
+  lightbox share these helpers and must keep the same order (filter on the image
+  elements, tint overlay, then white-balance overlay).
 - `src/lib/favorites.ts` — favorites JSON read/write and toggle by file id.
 - `src/lib/metadata.ts` — EXIF/size formatting for the info panel.
 - `src/lib/urlState.ts` — reads `?folder=`/`?photo=` and updates the address

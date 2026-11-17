@@ -12,5 +12,8 @@ Possible next steps live under "Roadmap (not implemented)" in the README.
 
 ~~- quality life on edit mode, when double click a slider option the value get to default, like temperature 0, brightness to 100% back, and so on.~~
 
-~~- i think the preview grid and lighbox has a little bit of differnt adjust render filter, for example when saturation and tempare high in grid i could see the different but in lightbox i couldnt, fix it~~
+~~- i think the preview grid and lighbox has a little bit of differnt adjust render filter, for example when saturation and tempare high in grid i could see the different but in lightbox i couldnt, fix it (still not working after multiple try of fixing, i think the problem lies in the image res changing and all that feature and so its kinda make everything a lil bit more complicated)~~
 
+- create a python script (just for reference - test local code) for image file adjustment filter and crop system, test if that json file from edit view could edit a image batch more easily and faster?
+
+- ..
