@@ -673,8 +673,10 @@ sections after *Where this could lead* are ordered by how much they change it.
 
 - **Export the edited photos.** The saved JSON is self-contained, and
   [`tools/apply_edits.py`](./tools/apply_edits.py) is the proof: it re-renders a
-  batch with Pillow + NumPy at roughly 0.6 s per 6 MP photo for a 1600 px output,
-  using the same crop math and the same filter/blend stack as the viewer. The
+  batch with Pillow + NumPy, keeping each file's own resolution by default (a
+  1:1 render of a 20 MP photo takes 2–6 s; `--size 1600` brings a 6 MP photo
+  down to ~0.6 s), using the same crop math and filter/blend stack as the
+  viewer. The
   natural next step is a real in-browser export (`canvas`), which needs the
   pixels to be CORS-readable — the thumbnail hosts are unlikely to cooperate, so
   expect either a same-origin proxy or a "download JSON, run the script" flow.

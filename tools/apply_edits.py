@@ -37,12 +37,19 @@ Examples:
     python tools/apply_edits.py edits.json                     # tools/media_input -> media_output
     python tools/apply_edits.py edits.json photos/ out/
     python tools/apply_edits.py edits.json photos/ out/ --map map.json
-    python tools/apply_edits.py edits.json photos/ out/ --all-with 1AbC... --size 2400
+    python tools/apply_edits.py edits.json photos/ out/ --all-with 1AbC...
+    python tools/apply_edits.py edits.json --size 1600        # optional downscale
     python tools/apply_edits.py --selftest        # checks the math, no files needed
 
-Timing is reported per image, which is the point of the exercise: a 24 MP JPEG
-is usually a few hundred milliseconds, so a folder of edits is a batch job, not
-a per-photo wait.
+Saved crops are applied, exactly like the viewer: a cropped photo comes out at
+the crop's pixel size (cut from the source, never resampled), and a photo with
+no crop keeps its original resolution. Either way the light/colour stack runs
+1:1 on the pixels it is given. `--ignore-crop` opts out of cropping entirely;
+`--size 1600` optionally caps the long edge of whatever the frame comes out as.
+
+Timing is reported per image, which is the point of the exercise: a 20 MP JPEG
+renders in a few seconds, so a folder of edits is a batch job, not a per-photo
+wait.
 """
 
 from __future__ import annotations
@@ -188,6 +195,21 @@ def crop_box(
         x0, x1 = 0, width
     if y1 <= y0:
         y0, y1 = 0, height
+
+    # Rounding twice can leave the box a pixel off the frame's ratio (a 1:1 crop
+    # coming out 2856x2855); derive one edge from the other so the ratio exact.
+    expected_h = max(1, int(round((x1 - x0) / ratio)))
+    if expected_h != y1 - y0:
+        if y0 + expected_h <= height:
+            y1 = y0 + expected_h
+        else:
+            y0 = max(0, y1 - expected_h)
+    expected_w = max(1, int(round((y1 - y0) * ratio)))
+    if expected_w != x1 - x0:
+        if x0 + expected_w <= width:
+            x1 = x0 + expected_w
+        else:
+            x0 = max(0, x1 - expected_w)
     return x0, y0, x1, y1
 
 
@@ -282,6 +304,25 @@ def soft_light_overlay(backdrop: np.ndarray, colour: np.ndarray) -> np.ndarray:
     return out
 
 
+def apply_adjustments_striped(
+    image: Image.Image, adjust: dict[str, float], strip: int = 256
+) -> Image.Image:
+    """Apply the colour stack a band of rows at a time.
+
+    The blend is per-pixel, so striping changes nothing in the result, but it
+    keeps peak memory flat: a 20 MP photo processed whole needs several
+    full-frame float32 temporaries (hundreds of MB each), while a strip needs a
+    few MB.
+    """
+    pixels = np.asarray(image, dtype=np.uint8)
+    out = np.empty_like(pixels)
+    for top in range(0, pixels.shape[0], strip):
+        band = pixels[top : top + strip].astype(np.float32) / np.float32(255.0)
+        adjusted = apply_adjustments(band, adjust)
+        out[top : top + strip] = np.round(adjusted * 255.0).astype(np.uint8)
+    return Image.fromarray(out)
+
+
 def apply_adjustments(rgb: np.ndarray, adjust: dict[str, float]) -> np.ndarray:
     """The exact stack the grid card and the lightbox both render."""
     out = css_filter(rgb, adjust)
@@ -309,28 +350,30 @@ def apply_adjustments(rgb: np.ndarray, adjust: dict[str, float]) -> np.ndarray:
 
 
 def render(
-    image: Image.Image, edit: dict[str, Any], long_edge: int
+    image: Image.Image,
+    edit: dict[str, Any],
+    long_edge: int,
+    use_crop: bool = True,
 ) -> Image.Image:
+    """Render one photo. `use_crop=False` keeps the full frame: colour only."""
     # Browsers honour EXIF orientation when painting an <img>; Pillow does not,
     # so transpose first or portrait phone shots come out sideways.
     source = ImageOps.exif_transpose(image).convert("RGB")
     width, height = source.size
 
-    crop = edit["crop"]
+    crop = edit["crop"] if use_crop else None
     if crop:
         source = source.crop(crop_box(width, height, crop))
         ratio = min(CROP_MAX_RATIO, max(CROP_MIN_RATIO, crop["ratio"]))
     else:
         ratio = width / height
 
-    target = output_size(ratio, long_edge)
-    source = source.resize(target, RESAMPLE)
+    # long_edge 0 means "leave the pixels alone": the output keeps the
+    # original resolution (or the crop's source pixels), and only colour changes.
+    if long_edge > 0:
+        source = source.resize(output_size(ratio, long_edge), RESAMPLE)
 
-    rgb = np.asarray(source, dtype=np.float32) / np.float32(255.0)
-    out = apply_adjustments(rgb, edit["adjust"])
-    return Image.fromarray(
-        np.round(np.clip(out, 0.0, 1.0) * 255.0).astype(np.uint8)
-    )
+    return apply_adjustments_striped(source, edit["adjust"])
 
 
 def save(image: Image.Image, path: Path, quality: int) -> None:
@@ -408,7 +451,9 @@ def run(args: argparse.Namespace) -> int:
 
         tick = time.perf_counter()
         with Image.open(path) as opened:
-            rendered = render(opened, edit, args.size)
+            rendered = render(
+                opened, edit, args.size, use_crop=not args.ignore_crop
+            )
         save(rendered, destination, args.quality)
         elapsed = (time.perf_counter() - tick) * 1000
         made += 1
@@ -546,9 +591,19 @@ def main() -> int:
         "--all-with", metavar="FILE_ID", help="apply one edit to every input file"
     )
     parser.add_argument(
-        "--size", type=int, default=1600, help="output long edge (default 1600)"
+        "--size",
+        type=int,
+        default=0,
+        help="cap the output long edge in pixels; 0 = keep each source's own "
+        "resolution (default)",
     )
     parser.add_argument("--quality", type=int, default=92, help="JPEG/WebP quality")
+    parser.add_argument(
+        "--ignore-crop",
+        action="store_true",
+        help="opt out of cropping: keep the full frame and only apply colour "
+        "(the default is to apply a saved crop)",
+    )
     parser.add_argument(
         "--format",
         dest="extension",
