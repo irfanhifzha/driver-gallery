@@ -32,6 +32,8 @@ const DETAIL_ZOOM = 2
 const PANEL_ID = 'lightbox-adjustments'
 const INFO_PANEL_ID = 'lightbox-info'
 const SHORTCUTS_PANEL_ID = 'lightbox-shortcuts'
+/** How long the copy button keeps its "copied" check mark. */
+const COPY_FEEDBACK_MS = 3000
 
 const SHORTCUTS = [
   { keys: '← / →', action: 'Previous / next photo' },
@@ -105,6 +107,7 @@ export function Lightbox({
   const pinchedRef = useRef(false)
   const swipeMovedRef = useRef(false)
   const settleTimerRef = useRef<number | undefined>(undefined)
+  const copyTimerRef = useRef<number | undefined>(undefined)
 
   const metaRef = useRef<HTMLDivElement>(null)
   const dockRef = useRef<HTMLDivElement>(null)
@@ -151,10 +154,13 @@ export function Lightbox({
   const [adjustOpen, setAdjustOpen] = useState(mode === 'editor')
   const [infoOpen, setInfoOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  /** File id whose link was just copied, for the button's check-mark cue. */
+  const [copiedId, setCopiedId] = useState<string | null>(null)
 
   const image = images[index]
   const failed = image ? failedId === image.id : false
   const edited = image ? Boolean(edits[image.id]) : false
+  const copied = image ? copiedId === image.id : false
   const hasPrev = index > 0
   const hasNext = index < images.length - 1
   // A crop only owns the gestures while it is being edited. In view mode the
@@ -188,6 +194,24 @@ export function Lightbox({
     window.clearTimeout(settleTimerRef.current)
     settleTimerRef.current = window.setTimeout(() => setSettling(false), 220)
   }, [])
+
+  /** Copy the thumbnail URL and show the check mark for a few seconds. */
+  const copyImageLink = useCallback(() => {
+    if (!image) return
+    navigator.clipboard
+      .writeText(`https://drive.google.com/thumbnail?id=${image.id}&sz=w1600`)
+      .then(() => {
+        setCopiedId(image.id)
+        window.clearTimeout(copyTimerRef.current)
+        copyTimerRef.current = window.setTimeout(
+          () => setCopiedId(null),
+          COPY_FEEDBACK_MS,
+        )
+      })
+      .catch(() => {
+        // Clipboard access can be blocked; leave the button unchanged.
+      })
+  }, [image])
 
   /** View-mode panel: drop the preview, leave any saved edit untouched. */
   const resetPreview = useCallback(() => {
@@ -339,7 +363,13 @@ export function Lightbox({
     [],
   )
 
-  useEffect(() => () => window.clearTimeout(settleTimerRef.current), [])
+  useEffect(
+    () => () => {
+      window.clearTimeout(settleTimerRef.current)
+      window.clearTimeout(copyTimerRef.current)
+    },
+    [],
+  )
 
   // Measure the filename/count/actions block and reserve that much room above
   // the photo, so the caption band never sits on top of the image — including
@@ -654,10 +684,10 @@ export function Lightbox({
       setCrop((prev) =>
         prev
           ? clampCrop({
-              ...prev,
-              x: cropDrag.originX - dx / Math.max(1, cropDrag.width / 2),
-              y: cropDrag.originY - dy / Math.max(1, cropDrag.height / 2),
-            })
+            ...prev,
+            x: cropDrag.originX - dx / Math.max(1, cropDrag.width / 2),
+            y: cropDrag.originY - dy / Math.max(1, cropDrag.height / 2),
+          })
           : prev,
       )
       setDirty(true)
@@ -991,19 +1021,51 @@ export function Lightbox({
           >
             Open in Google Drive ↗
           </a>
-          <a
-            className="lightbox-open"
-            href={`https://drive.google.com/uc?export=view&id=${image.id}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Copy Image
-          </a>
           <button
             type="button"
-            className={`lightbox-favorite${
-              favorites[image.id] ? ' is-favorite' : ''
-            }`}
+            className={`lightbox-open lightbox-copy${copied ? ' is-copied' : ''
+              }`}
+            onClick={copyImageLink}
+            aria-label={copied ? 'Link copied' : 'Copy image link'}
+            title={copied ? 'Copied!' : 'Copy image link'}
+          >
+            {copied ? (
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path
+                  d="m5 12.5 4.5 4.5L19 7.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <rect
+                  x="8.6"
+                  y="8.6"
+                  width="11.9"
+                  height="11.9"
+                  rx="2.2"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                />
+                <path
+                  d="M15.6 5.4v-.7a2.2 2.2 0 0 0-2.2-2.2H5.7a2.2 2.2 0 0 0-2.2 2.2v7.7a2.2 2.2 0 0 0 2.2 2.2h.7"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                />
+              </svg>
+            )}
+          </button>
+          <button
+            type="button"
+            className={`lightbox-favorite${favorites[image.id] ? ' is-favorite' : ''
+              }`}
             aria-pressed={Boolean(favorites[image.id])}
             onClick={() => onToggleFavorite(image)}
           >
@@ -1070,11 +1132,9 @@ export function Lightbox({
             </div>
           ) : (
             <div
-              className={`lightbox-image${
-                view.scale > MIN_ZOOM ? ' is-zoomed' : ''
-              }${dragging ? ' is-dragging' : ''}${
-                settling ? ' is-settling' : ''
-              }${cropEditing ? ' is-crop-editing' : ''}`}
+              className={`lightbox-image${view.scale > MIN_ZOOM ? ' is-zoomed' : ''
+                }${dragging ? ' is-dragging' : ''}${settling ? ' is-settling' : ''
+                }${cropEditing ? ' is-crop-editing' : ''}`}
               style={{
                 transform: `translate(${view.x + swipeX}px, ${view.y}px) scale(${view.scale})`,
               }}

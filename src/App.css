@@ -1485,6 +1485,33 @@ in   view mode the crop is just a preview and keeps the zoom cursor. */
   outline-offset: 2px;
 }
 
+.lightbox-copy {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  font: inherit;
+  border-radius: 50%;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.lightbox-copy svg {
+  width: 13px;
+  height: 13px;
+  display: block;
+}
+
+.lightbox-copy.is-copied {
+  color: #6ee7b7;
+  background: rgba(52, 211, 153, 0.16);
+  border-color: rgba(110, 231, 183, 0.6);
+}
+
 .lightbox-favorite {
   display: inline-flex;
   align-items: center;

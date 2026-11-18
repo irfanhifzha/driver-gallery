@@ -14,9 +14,13 @@ export function AdjustSlider({
   value,
   onChange,
 }: AdjustSliderProps) {
-  const resetToDefault = useCallback(() =>
-    onChange({ [control.key]: DEFAULT_ADJUSTMENTS[control.key] } as Partial<Adjustments>),
-  [])
+  const resetToDefault = useCallback(
+    () =>
+      onChange({
+        [control.key]: DEFAULT_ADJUSTMENTS[control.key],
+      } as Partial<Adjustments>),
+    [control.key, onChange],
+  )
   return (
     <div className="adjust-control">
       <label className="adjust-label" htmlFor={`adjust-${control.key}`}>

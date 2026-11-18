@@ -54,9 +54,11 @@ export function Gallery({ folderId }: GalleryProps) {
   const [edits, setEdits] = useState<EditMap>(readEdits)
   // A `?photo=` deep link is resolved once the listing is available; while it
   // is pending, the URL is left alone so the parameter isn't cleared first.
-  const [pendingPhoto, setPendingPhoto] = useState<string | null>(
+  const [pendingPhoto] = useState<string | null>(
     () => readUrlState().photo,
   )
+  /** The deep-linked file id already applied to page and lightbox state. */
+  const [appliedPhoto, setAppliedPhoto] = useState<string | null>(null)
 
   const types = useMemo(() => {
     const counts = new Map<string, number>()
@@ -106,6 +108,19 @@ export function Gallery({ folderId }: GalleryProps) {
     return copy
   }, [shown, sortKey, sortDir])
 
+  // Resolve a shared `?photo=<id>` against the full sorted list as soon as
+  // the listing is available (it may arrive after mount). Adjusting state
+  // during render keeps the deep link from flashing page one first.
+  const listingReady = !(loading && images.length === 0)
+  if (pendingPhoto && listingReady && appliedPhoto !== pendingPhoto) {
+    const index = sorted.findIndex((image) => image.id === pendingPhoto)
+    setAppliedPhoto(pendingPhoto)
+    if (index >= 0) {
+      setPage(Math.floor(index / PER_PAGE) + 1)
+      setOpenIndex(index % PER_PAGE)
+    }
+  }
+
   const hasImages = sorted.length > 0
   const pageCount = Math.max(1, Math.ceil(sorted.length / PER_PAGE))
   const currentPage = Math.min(page, pageCount)
@@ -115,29 +130,13 @@ export function Gallery({ folderId }: GalleryProps) {
     openIndex !== null && openIndex < pageImages.length ? openIndex : null
   const activeImage = activeIndex !== null ? pageImages[activeIndex] : undefined
 
-  // Resolve a shared `?photo=<id>` against the full sorted list, then jump to
-  // the page it lives on so the lightbox opens on the right photo.
+  // Keep `?photo=` in step with the lightbox once the deep link has settled,
+  // so the address bar stays shareable and a stale id is dropped.
+  const deepLinkPending = pendingPhoto !== null && appliedPhoto !== pendingPhoto
   useEffect(() => {
-    if (!pendingPhoto) return
-    // On a cold load, wait for the listing instead of discarding the link.
-    if (loading && images.length === 0) return
-
-    const index = sorted.findIndex((image) => image.id === pendingPhoto)
-    if (index >= 0) {
-      setPage(Math.floor(index / PER_PAGE) + 1)
-      setOpenIndex(index % PER_PAGE)
-    } else if (!error || images.length > 0) {
-      // The link no longer matches anything visible; drop the stale parameter.
-      updateUrl({ photo: null })
-    }
-    setPendingPhoto(null)
-  }, [pendingPhoto, loading, images.length, error, sorted])
-
-  // Keep `?photo=` in step with the lightbox so the address bar stays shareable.
-  useEffect(() => {
-    if (pendingPhoto !== null) return
+    if (deepLinkPending) return
     updateUrl({ photo: activeImage?.id ?? null })
-  }, [pendingPhoto, activeImage?.id])
+  }, [deepLinkPending, activeImage?.id])
 
   const resetPaging = () => {
     setPage(1)
