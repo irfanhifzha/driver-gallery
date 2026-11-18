@@ -991,6 +991,14 @@ export function Lightbox({
           >
             Open in Google Drive ↗
           </a>
+          <a
+            className="lightbox-open"
+            href={`https://drive.google.com/uc?export=view&id=${image.id}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Copy Image
+          </a>
           <button
             type="button"
             className={`lightbox-favorite${
